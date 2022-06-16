@@ -5,7 +5,7 @@ Read files from Thesis/data/scmp/2021.csv, get text, and extract quotes
 """
 
 #%%
-import pandas as pd
+# import pandas as pd
 from quotes import quote_extractor
 import spacy
 import time 
@@ -52,6 +52,8 @@ def run(input_df, output_name):
 # %%
 resdf = timeit(run, df.head(100), "test2.csv")
 print(len(resdf))
+# timeit(run, df.head(), "test.csv")
+# df.Body = df.Body.astype(str)
 # 2021 had some Nan columns which will not have named entities
 # TODO: create cleaning script which has columns to drop
 
