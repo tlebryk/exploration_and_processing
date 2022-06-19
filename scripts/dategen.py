@@ -34,9 +34,9 @@ for publication in utils.publications.values():
         # follow report was that significant changes took  place in April 2016; 
         # 2016 seems safe as delimiter?
         # https://techcrunch.com/2016/04/05/alibaba-completes-scmp-acquisition-and-removes-the-papers-online-paywall/
-        df["post_baba"] = df.Year > 2016
+        df["post_baba"] = (df.Year > 2016).astype(int)
         df["publication"] = publication.name
-        df['baba_ownership'] = (df.post_baba) &( df.publication == "scmp")
+        df['baba_ownership'] = (df.post_baba.eq(1) & df.publication.eq("scmp")).astype(int)
         path = os.path.join(utils.ROOTPATH, publication.name, "date")
         os.makedirs(path, exist_ok=True)
         df[[
