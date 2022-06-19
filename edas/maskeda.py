@@ -97,20 +97,3 @@ report(len(df[mask]), len(df[~mask]))
 df.loc[mask.notna() & mask.eq(False)].Topics.explode().value_counts().head(10)
 # hong kong filter seems effective - topics are irrelevant to hk or magazine anyway. 
 
-# %% train_test_split
-from sklearn.model_selection import train_test_split
-def tts(publication, *args, **kwargs):
-    """Train test splits data for a publication
-    :param args: arguments to be passed to train_test_split 
-    """
-    df = get_df(publication,"polimask", "pmask_.csv")
-    train, test = train_test_split(df[publication.uidcol], *args, **kwargs)
-    path = os.path.join(ROOTPATH, publication.name, "tts_mask")
-    if not os.path.exists(path):
-        os.makedirs(path)
-    train.to_csv(os.path.join(path, "train.csv"))
-    test.to_csv(os.path.join(path, "test.csv"))
-    return train, test
-
-kwargs = dict(random_state=1, test_size=0.9)
-[tts(pub, **kwargs) for pub in publications]
