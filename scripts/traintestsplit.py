@@ -29,6 +29,9 @@ kwargs = dict(random_state=1, test_size=0.9)
 # scmp
 publication = utils.publications["scmp"]
 df = utils.get_df(publication)
+dupmask = df[publication.uidcol].duplicated()
+dupmask.value_counts()
+# result: no duplicates
 maskna = df[publication.textcol].isna()
 sections = utils.get_df(publication, *["sections", "sections.csv"])
 strsects = (
@@ -52,25 +55,43 @@ drops[publication.uidcol].to_csv(
 publication = utils.publications["chinadaily"]
 df = utils.get_df(publication)
 maskst = df.storyType.astype(str).str.contains("VIDEO|AUDIO|HREF|INNERLINK")
-drops = df[maskst]
-keeps = df[~maskst]
+dupmask = df[publication.uidcol].duplicated()
+dupmask.value_counts()
+# 315 duplicates
+drops = df[maskst | dupmask]
+keeps = df[~maskst & ~dupmask]
 tts(publication, df=keeps, splitname="main1", **kwargs)
 drops[publication.uidcol].to_csv(
     os.path.join(utils.ROOTPATH, publication.name, "tts_mask", "drops_main1.csv")
 )
 # %%
 # nyt
-# NOT READY YET
 publication = utils.publications["nyt"]
-tts(publication, splitname="main1", **kwargs)
-
+df = utils.get_df(publication)
+dupmask = df[publication.uidcol].duplicated()
+dupmask.value_counts()
+# 418 duplicates
+drops = df[dupmask]
+keeps = df[~dupmask]
+tts(publication, df=keeps, splitname="main1", **kwargs)
+drops[publication.uidcol].to_csv(
+    os.path.join(utils.ROOTPATH, publication.name, "tts_mask", "drops_main1.csv")
+)
 # %%
 # hkfp
 publication = utils.publications["hkfp"]
+df = utils.get_df(publication)
+dupmask = df[publication.uidcol].duplicated()
+dupmask.value_counts()
+# no duplicates :)
 tts(publication, splitname="main1", **kwargs)
 # %%
 # globaltimes
 publication = utils.publications["globaltimes"]
+df = utils.get_df(publication)
+dupmask = df[publication.uidcol].duplicated()
+dupmask.value_counts()
+# no duplciates :)
 tts(publication, splitname="main1", **kwargs)
 
 
