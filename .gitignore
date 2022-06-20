@@ -5,3 +5,4 @@ logs/
 *.txt
 build
 thesisutils.egg-info
+scrap/

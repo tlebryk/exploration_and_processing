@@ -12,20 +12,23 @@ logger = logging.getLogger(__name__)
 ROOTPATH = r"C:\Users\tlebr\OneDrive - pku.edu.cn\Thesis\data"
 
 class Publication:
-    def __init__(self, name, textcol, uidcol) -> None:
+    """Standardizes retreival of disparately named columns. """
+    def __init__(self, name, textcol, uidcol, hdcol) -> None:
         self.name = name
         self.textcol = textcol
         self.uidcol = uidcol
+        self.headline = hdcol
+        # self.authorcol = authcol
     def __repr__(self) -> str:
         return self.name
 
 
 publications = {
-    "scmp": Publication("scmp", "Body", "Index"),
-    "nyt": Publication("nyt", "text", "sourceurl"),
-    "globaltimes": Publication("globaltimes", "Body", "Art_id"),
-    "chinadaily": Publication("chinadaily", "plainText", "id"),
-    "hkfp": Publication("hkfp", "Body", "Art_id"),
+    "scmp": Publication("scmp", "Body", "Index", "Headline"),
+    "nyt": Publication("nyt", "text", "sourceurl", "title"),
+    "globaltimes": Publication("globaltimes", "Body", "Art_id", "Title"),
+    "chinadaily": Publication("chinadaily", "plainText", "id", "title"),
+    "hkfp": Publication("hkfp", "Body", "Art_id", "Headline"),
 }
 
 s3 = boto3.client("s3")

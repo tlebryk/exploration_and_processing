@@ -1,7 +1,7 @@
 import setuptools
 
 setuptools.setup(name='thesisutils',
-version='0.2',
+version='0.3',
 description='Common functions I need to stop writing over and over',
 url='#',
 author='Theo',
