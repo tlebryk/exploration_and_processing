@@ -1,8 +1,8 @@
 import setuptools
 
 setuptools.setup(name='thesisutils',
-version='0.3',
-description='Common functions I need to stop writing over and over',
+version='0.3.1',
+description='Add timeit and justletters',
 url='#',
 author='Theo',
 install_requires=[

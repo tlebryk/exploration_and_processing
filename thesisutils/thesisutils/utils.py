@@ -1,11 +1,16 @@
 """
 If you're working on different machines, overwrite the ROOTPATH to whatever path you have on your machine.
 """
+import re
+
 import boto3
 from botocore.exceptions import ClientError
 import logging
 import os
 import pandas as pd
+import time
+from io import StringIO # Python 3.x
+
 
 logger = logging.getLogger(__name__)
 
@@ -63,4 +68,25 @@ def get_df(publication, *args):
         args = [f"{publication.name}_full.csv"]
     fullpath = os.path.join(ROOTPATH, publication.name, *args)
     df = pd.read_csv(fullpath)
+    return df
+
+def justletters(s):
+    return re.sub(r"[^A-Za-z]+", '', s)
+
+def timeit(fn, *args, **kwargs):
+    s = time.perf_counter()
+    ret = fn(*args, **kwargs)
+    e = time.perf_counter()
+    print(f"{fn.__name__} took {e-s} secs")
+    return ret
+
+
+def read_df_s3(object_key, bucket="newyorktime"):
+    """Reads a csv from s3 and loads into pandas;
+    Means do not have to store large files locally anymore. 
+    """
+    csv_obj = s3.get_object(Bucket=bucket, Key=object_key)
+    body = csv_obj['Body']
+    csv_string = body.read().decode('utf-8')
+    df = pd.read_csv(StringIO(csv_string))
     return df
