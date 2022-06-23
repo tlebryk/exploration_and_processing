@@ -1,3 +1,16 @@
+"""Dictionary for logging configuration. 
+sample usage as import: 
+```
+import logging, logging.config
+from pathlib import Path
+import logconfig
+
+lgconf = logconfig.logconfig(Path(__file__).stem)
+logging.config.dictConfig(lgconf.config_dct)
+logger = logging.getLogger(__name__)
+```
+
+"""
 from datetime import datetime
 import os
 DATETIMENOW = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -59,3 +72,10 @@ class logconfig:
 def log_clean():
     """Deletes all but most recent file in each logging folder"""
     pass
+
+
+publication = utils.publications['scmp']
+ls = (utils.get_df(publication, "ner", f"ner_{year}.csv") for year in range(2011, 2022))
+df = pd.concat(ls) 
+utils.df_to_s3(df, f"{publication.name}/ner/ner_full.csv")
+df.to_csv(r"C:\Users\tlebr\OneDrive - pku.edu.cn\Thesis\data\scmp\ner\ner_full.csv")
