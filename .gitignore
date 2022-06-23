@@ -6,3 +6,4 @@ logs/
 build
 thesisutils.egg-info
 scrap/
+.Rproj.user
