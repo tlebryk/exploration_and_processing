@@ -1,0 +1,9 @@
+.vscode/
+*.ipynb_checkpoints
+logs/
+*.csv
+*.txt
+build
+thesisutils.egg-info
+scrap/
+.Rproj.user
