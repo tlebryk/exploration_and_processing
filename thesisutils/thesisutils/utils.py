@@ -9,7 +9,7 @@ import logging
 import os
 import pandas as pd
 import time
-from io import StringIO # Python 3.x
+from io import StringIO
 
 
 logger = logging.getLogger(__name__)
@@ -38,7 +38,8 @@ publications = {
 
 s3 = boto3.client("s3")
 
-def upload_s3(filepath, bucket, key=None):
+def upload_s3(filepath, bucket="newyorktime", key=None):
+    """Uploads a file to s3"""
     if not key:
         key = filepath
     try:
@@ -46,8 +47,12 @@ def upload_s3(filepath, bucket, key=None):
         return response
     except ClientError as e:
         logger.exception(e)
-
-
+def df_to_s3(df, key, bucket="newyorktime"):
+    """Directly saves a dataframe to a csv on s3 without saving locally."""
+    csv_buffer = StringIO()
+    df.to_csv(csv_buffer)
+    s3_resource = boto3.resource('s3')
+    s3_resource.Object(bucket, key).put(Body=csv_buffer.getvalue())
 
 def get_perc(a, b):
     return round(a/ (a+b),3) *100
@@ -74,6 +79,9 @@ def justletters(s):
     return re.sub(r"[^A-Za-z]+", '', s)
 
 def timeit(fn, *args, **kwargs):
+    """Takes a function and optional args
+    and returns output but prints time
+    """
     s = time.perf_counter()
     ret = fn(*args, **kwargs)
     e = time.perf_counter()
