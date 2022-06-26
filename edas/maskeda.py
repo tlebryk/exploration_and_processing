@@ -1,5 +1,6 @@
 """
-Explores the effect of subsetting the data on political articles and dropping text columns
+Explores the effect of subsetting the data on political articles
+ and dropping columns based on keywords
 """
 # %%
 import pandas as pd

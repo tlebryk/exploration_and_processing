@@ -58,9 +58,11 @@ def get_perc(a, b):
     return round(a/ (a+b),3) *100
 
 def report(a, b):
+    """prints: a/a+b as percent and full fraction."""
     perc = get_perc(a,b)
     print(perc, "%")
     print(a, "/", a+b)
+    return perc
 
 def get_df(publication, *args):
     """

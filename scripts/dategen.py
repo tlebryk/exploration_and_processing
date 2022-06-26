@@ -6,7 +6,6 @@ Run on 6/19/2021
 from thesisutils import utils
 import pandas as pd
 import os
-import datetime
 # publication.name
 # publication = utils.publications['scmp']
 for publication in utils.publications.values():

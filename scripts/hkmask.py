@@ -1,5 +1,4 @@
-# other sources were compiled by looking
-# at articles with hong kong in the text. 
+"""Searches for 'hong kong' in the headline or body of a text. """
 
 import pandas as pd
 from thesisutils import utils

@@ -1,8 +1,9 @@
-""" Currently only runs on scmp; will run on threst of corpus later."""
+"""Searches for people, orgs, nations, places, laws using spacy NER."""
+import os
 from thesisutils import utils
 import pandas as pd
 import spacy
-
+from tqdm import tqdm
 
 import pandas as pd
 
@@ -13,6 +14,8 @@ import logconfig
 lgconf = logconfig.logconfig(Path(__file__).stem)
 logging.config.dictConfig(lgconf.config_dct)
 logger = logging.getLogger(__name__)
+
+tqdm.pandas()
 
 #%%
 # first col has quotes
@@ -33,12 +36,8 @@ ner_filter = [
 
 ]
 # %%
-# row = df.iloc[2]
-# doc = nlp(row["Body"], disable=["tok2vec", "tagger", "parser", "attribute_ruler", "lemmatizer"])
-# doc.ents
-# %%
 
-def ner(row, text_col, uid_col, publication, year="2012"):
+def ner(row, text_col, uid_col, publication):
     dct_ls = []
     doc = nlp(row[text_col], disable=["tok2vec", "tagger", "parser", "attribute_ruler", "lemmatizer"])
     ents = doc.ents
@@ -53,14 +52,14 @@ def ner(row, text_col, uid_col, publication, year="2012"):
                 "end" : ent.end,
                 publication.uidcol: row[uid_col],
                 "publication": publication.name,
-                "year": year,
+                # "year": year,
             }
             dct_ls.append(dct)
     return dct_ls
 
 def run(input_df, output_name, text_col, **kwargs):
     input_df[text_col] = input_df[text_col].astype(str)
-    ner_dcts = input_df.apply(
+    ner_dcts = input_df.progress_apply(
         lambda row: ner(row, text_col, **kwargs), axis=1
     )
     nerdf = pd.json_normalize(ner_dcts.explode()).dropna().convert_dtypes()
@@ -68,19 +67,57 @@ def run(input_df, output_name, text_col, **kwargs):
     return nerdf
     # print(f"{list(ent.sents)=}") # for debugging
 
-publication = utils.publications["scmp"]
-for year in range(2020, 2021):#2020
-    logger.info("working on %s", year)
-    df = utils.get_df(publication, f"{year}.csv")
+# for publication in utils.publications.values():
+#     if publication.name == "scmp":
+#         continue
+#     else:
+
+# publication = utils.publications["scmp"]
+# for year in range(2020, 2021):#2020
+    # logger.info("working on %s", year)
+
+# %%
+# publication = utils.publications["nyt"]
+# logger.info("working on %s", publication.name)
+# df = utils.get_df(publication)
+# kwargs = {
+#     # "year": year,
+#     "publication": publication,
+#     "text_col": publication.textcol,
+#     "uid_col": publication.uidcol
+# }
+# key = f"{publication.name}/ner/ner_full.csv"
+# output_name = os.path.join(utils.ROOTPATH, key)
+# nerdf = utils.timeit(run, df, output_name, **kwargs)
+# utils.df_to_s3(nerdf, key)
+# %%
+def ner_run(publication):
+    # publication = utils.publications["nyt"]
+    logger.info("working on %s", publication.name)
+    df = utils.get_df(publication)
     kwargs = {
-        "year": year,
+        # "year": year,
         "publication": publication,
         "text_col": publication.textcol,
         "uid_col": publication.uidcol
     }
-    # %%
-
-    nerdf = utils.timeit(run, df, f"ner_{year}.csv", **kwargs)
+    key = f"{publication.name}/ner/ner_full.csv"
+    output_name = os.path.join(utils.ROOTPATH, key)
+    if not os.path.exists(output_name):
+        os.makedirs(os.path.dirname(output_name))
+    nerdf = utils.timeit(run, df, output_name, **kwargs)
+    utils.df_to_s3(nerdf, key)
+# %%
+ner_run(utils.publications['chinadaily'])
+# %%
+ner_run(utils.publications['nyt'])
+# %%
+# 3 run starting here
+ner_run(utils.publications['hkfp'])
+# %%
+ner_run(utils.publications['globaltimes'])
+# %%
+ner_run(utils.publications['scmp'])
 
 
 # %%

@@ -36,7 +36,10 @@ rootpath = r"C:\Users\tlebr\OneDrive - pku.edu.cn\Thesis\data"
 #             logger.warning("WARNING WHY ISN'T DATA HERE", publication.name)
 #         else:
 #             res = utils.upload_s3(datapath, bucket, key)
-def upload(folder, publication):
+def upload(folder, publication, bucket=bucket):
+    """Takes a folder (e.g. date) and publication and uploads 
+        all the contents to the s3 in the same path starting from data/* where * is key. 
+    """
     logger.info("WORKING ON %s %s ------------", publication.name, folder)
     relativepath = os.path.join(publication.name, folder)
     files = os.listdir(os.path.join(rootpath, relativepath))

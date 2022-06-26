@@ -1,3 +1,4 @@
+"""Performs spacy large english NER on text column of df."""
 from thesisutils import utils
 import pandas as pd
 import spacy
@@ -9,19 +10,19 @@ import os
 
 import pandas as pd
 
-import logconfig
+# import logconfig
 
-lgconf = logconfig.logconfig(Path(__file__).stem)
-logging.config.dictConfig(lgconf.config_dct)
-logger = logging.getLogger(__name__)
-
-
-# logger = logging.getLogger("simpleExample")
+# lgconf = logconfig.logconfig(Path(__file__).stem)
+# logging.config.dictConfig(lgconf.config_dct)
+# logger = logging.getLogger(__name__)
 
 
+# # logger = logging.getLogger("simpleExample")
 
 
-lgconf = logconfig.logconfig(Path(__file__).stem)
+
+
+# lgconf = logconfig.logconfig(Path(__file__).stem)
 
 
 #%%

@@ -13,6 +13,8 @@ library(ggplot2)
 library(aws.s3)
 
 source("textProcessor.R")
+source("printsagelabels.R")
+
 set.seed(123456)
 
 # get training data
@@ -24,8 +26,8 @@ publications <- c("hkfp",
 
 rootpath <- r"{C:\Users\tlebr\OneDrive - pku.edu.cn\Thesis\data}"
 
-mystops <- readLines(r"{C:\Users\tlebr\OneDrive - pku.edu.cn\Thesis\code\mystops.txt}")
-polistops <- readLines(r"{C:\Users\tlebr\OneDrive - pku.edu.cn\Thesis\code\polistops.txt}")
+mystops <- readLines(r"{C:\Users\tlebr\OneDrive - pku.edu.cn\Thesis\code\R\mystops.txt}")
+polistops <- readLines(r"{C:\Users\tlebr\OneDrive - pku.edu.cn\Thesis\code\R\polistops.txt}")
 fullstop <- c(mystops, polistops)
 
 # alibaba ownership categorical
@@ -74,7 +76,7 @@ loaddata <- function(publication, filename="train_main1.csv") {
     select(-any_of(c("X"))) %>%
     distinct(doc_id, .keep_all=TRUE) %>%
     # create publication column
-    mutate(Publication = factor(publication, levels=publications),
+    mutate(Publication = factor(publication, levels=publications),=====
            text = paste(Headline, "; ", Body)
            )
            
@@ -96,10 +98,12 @@ loaddata <- function(publication, filename="train_main1.csv") {
 }
 
 
+
 df <- publications %>%
   lapply(loaddata) %>%
-  bind_rows() %>%
-  sample_n(50)
+  bind_rows() # %>%
+  # sample_n(50)
+
 
 
 # final columns of import:
@@ -127,38 +131,63 @@ processed <- textProcessor(df$text,
                            )
 out <- prepDocuments(processed$documents,
                      processed$vocab, 
-                     lower.thresh = length(processed$documents) *.001, 
+                     lower.thresh = length(processed$documents) *.0015, 
                      meta=processed$meta,
                      upper.thresh = length(processed$documents) *.9
 )
-docs <- out$documents
-vocab <- out$vocab
-meta <-out$meta
-
+# docs <- out$documents
+# vocab <- out$vocab
+# meta <-out$meta
+out$meta %>% count(Year)
 # prev_equation <- "~Publication + s(Year) + Alibaba_own"
 
-fitmodel <- stm(docs, out$vocab, K=5,
-                max.em.its = 5, data = out$meta,
+
+
+fitmodel <- stm(out$documents, out$vocab, K=50,
+                max.em.its = 75, data = out$meta,
                 init.type = "Spectral",
                 prevalence=~Publication + s(Year) + Alibaba_own, # + as.factor(Publication)
                 content=~Publication,
-                seed=1,
+                seed=123456,
                 # gamma.prior="L1"
-                # data = out$meta
                 )
 
+plot.STM(fitmodel, type="summary", n=3)#, covarlevels = c("scmp", "chinadaily"))
+
+findThoughts(fitmodel, df$Headline, topics=18, n=10)#, meta=out$meta)
 
 
+saveRDS(fitmodel, "./fitmodel.RDS")
+# labelTopics
+
+protest_topics <- c(3,6,13,23,31,33,35, 49) # drop 7: it's petty crime not geopolitical. 
+labels <- labelTopics(fitmodel, protest_topics)
+labels$topics
 
 summary(fitmodel)
-findThoughts(fitmodel, out$Textcol, topics=1, n=2)
+findThoughts(fitmodel, out$Headline, topics=protest_topics, n=5, meta=out$meta)
 
-eff <- estimateEffect(c(1) ~ Publication + s(Year), stmobj = fitmodel,
+effall <- estimateEffect( ~ Publication + s(Year) + Alibaba_own, stmobj = fitmodel,
+                      metadata = out$meta, uncertainty = "Global")
+plot.estimateEffect(effall, "Alibaba_own", method="difference", cov.value1 = 1, cov.value2 = 0)
+
+eff <- estimateEffect(protest_topics ~ Publication + s(Year) + Alibaba_own, stmobj = fitmodel,
                       metadata = out$meta, uncertainty = "Global")
 # this will be scmp at somepoint
 # 
-plot.estimateEffect(eff, "Publication", topics=1, method="difference", cov.value1 = "scmp", cov.value2 = "chinadaily")
-summary(eff, topics=1)
+plot.estimateEffect(eff, "Alibaba_own", topics=protest_topics, method="difference", cov.value1 = 1, cov.value2 = 0)
+summary(eff, topics=protest_topics)
+
+
+eff35 <- estimateEffect(c(35) ~ Year * Publication, stmobj = fitmodel,
+                      metadata = out$meta, uncertainty = "Global")
+
+
+
+plot(eff, covariate="Year", method="continuous",topics=33,
+     model=fitmodel)
+labelTopics(fitmodel, topics=33, n=10)
+sageLabels(fitmodel,)
 
 
 tcorre <- topicCorr(fitmodel)
@@ -174,7 +203,6 @@ plot.topicCorr(tcorre)
 
 
 # SAVE THE MODEL
-# saveRDS(fitmodel, "./fitmodel.RDS")
 
 
 
@@ -203,8 +231,7 @@ plot.topicCorr(tcorre)
 # https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/QHJN8V
 test <- publications %>%
   lapply(loaddata, filename="test_main1.csv") %>%
-  bind_rows() %>% 
-  sample_n(50)
+  bind_rows() 
   
 
 processedtest <- textProcessor(test$text,
@@ -215,35 +242,45 @@ processedtest <- textProcessor(test$text,
 new <- stm::alignCorpus(processedtest,out$vocab)
 
 testfit <- fitNewDocuments(fitmodel, documents=new$documents, newData=new$meta, 
-                           origData=out$meta, prevalencePrior = "Average", prevalence= ~Publication + s(Year) + Alibaba_own)
+                           origData=out$meta, prevalencePrior = "Average",
+                           # content=~Publication,
+                           prevalence= ~Publication + s(Year) + Alibaba_own
+                           
+                           )
 
 trainfit <- fitNewDocuments(fitmodel, documents=out$documents, newData=out$meta, 
-                            origData=out$meta, prevalencePrior = "Average", prevalence= ~Publication + s(Year) + Alibaba_own)
+                            origData=out$meta, prevalencePrior = "Average",
+                            # content=~Publication
+                            prevalence= ~Publication + s(Year) + Alibaba_own
+                            )
 nocovfit <- fitNewDocuments(fitmodel, documents=new$documents, newData=new$meta, 
-                            origData=out$meta, prevalencePrior = "None", prevalence= ~Publication + s(Year) + Alibaba_own)
+                            origData=out$meta, prevalencePrior = "None", 
+                            # content=~Publication
+                            prevalence= ~Publication + s(Year) + Alibaba_own
+                            )
 
 
-K <- 5
-
-
+K <- 50
 testeffect <- fitmodel
 testeffect$theta <- testfit$theta
 traineffect <- fitmodel
 traineffect$theta <- trainfit$theta
 nocov <- fitmodel
 nocov$theta <- nocovfit$theta
-prepfulltrain <- estimateEffect(c(1:K) ~Publication + s(Year) + Alibaba_own, fitmodel, meta=out$meta, uncertainty = "None")
+prepfulltrain <- estimateEffect(protest_topics ~Publication + s(Year) + Alibaba_own, fitmodel, meta=out$meta, uncertainty = "None")
+summary(prepfulltrain)
+
 prepfulltrainplot <- plot(prepfulltrain, "Alibaba_own", method="difference", cov.value1=1, cov.value2=0, 
                           main="Training Set", labeltype="custom",
                           # custom.labels=topic,
                           xlab="Treatment - Control",xlim=c(-.06,.07))
-preptest <- estimateEffect(c(1:K) ~Publication + s(Year) + Alibaba_own, testeffect, meta=new$meta, uncertainty = "None")
+preptest <- estimateEffect(protest_topics ~Publication + s(Year) + Alibaba_own, testeffect, meta=new$meta, uncertainty = "None")
 preptestplot <- plot(preptest, "Alibaba_own", method="difference", cov.value1=1, cov.value2=0, 
                      main="Test Set", labeltype="custom",
                      # custom.labels=topic, 
                      xlab="Treatment - Control",xlim=c(-.06,.07))
-prep <- estimateEffect(c(1:K) ~Publication + s(Year) + Alibaba_own, traineffect, meta=out$meta, uncertainty="None")
-prepnocov <- estimateEffect(c(1:K) ~Publication + s(Year) + Alibaba_own, nocov, meta=new$meta, uncertainty = "None")
+prep <- estimateEffect(protest_topics ~Publication + s(Year) + Alibaba_own, traineffect, meta=out$meta, uncertainty="None")
+prepnocov <- estimateEffect(protest_topics ~Publication + s(Year) + Alibaba_own, nocov, meta=new$meta, uncertainty = "None")
 prepnocovplot <- plot(prepnocov, "Alibaba_own", method="difference", cov.value1=1, cov.value2=0, 
                       main="Test Set", labeltype="custom",
                       # custom.labels=topic,
@@ -282,3 +319,11 @@ for(i in 1:K){
 }
 legend(.043, 3, c("Training Set", "Training Set With \n Averaged Prior", "Test Set"),
        col=c("darkgreen", "black", "red"), lty=c(3,1,2), pch=c(17,16,15))
+
+
+
+protest_topics
+
+print.sageLabels2(sglabs, protest_topics)
+
+sglabs$cov.betas
