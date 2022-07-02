@@ -7,7 +7,7 @@ By default things are run using the thesis virtual environment. Newssentiment re
 
 - `scripts`: python files to be run once to usually to generate new data or upload data.
     - `data2s3.py`: Uploads most of the contents of local data folder to s3 with the same key path. Run for the newyorktime directory right now. 
-    - `dategen.py`: makes of `data/{publication}/date/date.csv` folder w/ date standardization. 
+    - `dategen.py`: makes of `data/{publication}/date/date.csv` folder w/ date standardization. Run on both the main hong kong dataset and the alibaba subset for nyt, gt, and cd.
     - `hkmask.py`: makes `data/{publication}/hk_mask/hkmask.csv`. Searches for "hong kong" in headline or body. Most important for SCMP and HKFP which didn't have hong kong filter in original data collection process, but run on everything to double check hong kong relevance. 
     - `logconfig.py`: logging configuration plain and simple
     - `ner_run.py`: soact NER for ppl, places, things in body of text. 

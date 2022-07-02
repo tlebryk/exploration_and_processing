@@ -1,8 +1,8 @@
 import setuptools
 
 setuptools.setup(name='thesisutils',
-version='0.3.2',
-description='Add df_to_s3',
+version='0.3.4',
+description='Add maindateload',
 url='#',
 author='Theo',
 install_requires=[
