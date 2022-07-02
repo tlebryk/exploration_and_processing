@@ -73,11 +73,12 @@ def df_to_s3(df, key, bucket="newyorktime"):
 
 
 def get_perc(a, b):
+    """Return percent a out of a+b to 3 decs"""
     return round(a / (a + b), 3) * 100
 
 
 def report(a, b):
-    """prints: a/a+b as percent and full fraction."""
+    """prints: a/a+b as percent and full fraction & returns"""
     perc = get_perc(a, b)
     print(perc, "%")
     print(a, "/", a + b)
@@ -86,7 +87,7 @@ def report(a, b):
 
 def get_df(publication, *args):
     """
-
+    Gets dataframe from publication.name/args*
     :param: args are strings which are joined to be the final path
         e.g. "polimask", "pmask_.csv" becomes rootpath/publication/polimask/pmask_.csv
         If no args are given, default to full csv.
@@ -154,7 +155,7 @@ def main_date_load(pub, baba=False, *args):
     """
     df = standardize(get_df(pub, *args), pub)
     df = df.drop("Date", axis=1, errors="ignore")
-    df['Textcol'] =df.Headline + "; " + df.Body
+    df["Textcol"] = df.Headline + "; " + df.Body
     mask = df.Textcol.notna()
     print("keeping non-na text cols:")
     print(mask.value_counts())
