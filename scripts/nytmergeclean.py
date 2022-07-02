@@ -3,6 +3,12 @@
  """
 
 import pandas as pd
+import boto3
+from thesisutils import utils
+
+df = utils.read_df_s3(object_key="nyt/clean_main.csv", bucket="aliba")
+
+df.columns
 
 # merging strat:
 (
