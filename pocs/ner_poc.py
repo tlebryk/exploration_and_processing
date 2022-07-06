@@ -1,19 +1,34 @@
+"""Performs spacy large english NER on text column of df."""
+from thesisutils import utils
 import pandas as pd
 import spacy
-import time 
+import logging
+
+import logging, logging.config
+from pathlib import Path
+import os
+
+import pandas as pd
+
+# import logconfig
+
+# lgconf = logconfig.logconfig(Path(__file__).stem)
+# logging.config.dictConfig(lgconf.config_dct)
+# logger = logging.getLogger(__name__)
 
 
-def timeit(fn, *args, **kwargs):
-    s = time.perf_counter()
-    ret = fn(*args, **kwargs)
-    e = time.perf_counter()
-    print(f"{fn.__name__} took {e-s} secs")
-    return ret
+# # logger = logging.getLogger("simpleExample")
+
+
+
+
+# lgconf = logconfig.logconfig(Path(__file__).stem)
+
 
 #%%
 # first col has quotes
 nlp = spacy.load("en_core_web_lg")
-df = pd.read_csv(r"C:\Users\tlebr\OneDrive - pku.edu.cn\Thesis\data\scmp\2021.csv")
+# df = pd.read_csv(r"C:\Users\tlebr\OneDrive - pku.edu.cn\Thesis\data\scmp\2021.csv")
 # %%
 ner_filter = [
     "DATE",
@@ -29,12 +44,12 @@ ner_filter = [
 
 ]
 # %%
-row = df.iloc[2]
-doc = nlp(row["Body"], disable=["tok2vec", "tagger", "parser", "attribute_ruler", "lemmatizer"])
-doc.ents
+# row = df.iloc[2]
+# doc = nlp(row["Body"], disable=["tok2vec", "tagger", "parser", "attribute_ruler", "lemmatizer"])
+# doc.ents
 # %%
-ent.__dir__()
-def ner(row, text_col, uid_col, publication="scmp", year="2012"):
+
+def ner(row, text_col, uid_col, publication, year="2012"):
     dct_ls = []
     doc = nlp(row[text_col], disable=["tok2vec", "tagger", "parser", "attribute_ruler", "lemmatizer"])
     ents = doc.ents
@@ -47,19 +62,12 @@ def ner(row, text_col, uid_col, publication="scmp", year="2012"):
                 # "label" : ent.label,
                 "start" : ent.start,
                 "end" : ent.end,
-                "Index": row[uid_col],
-                "publication": publication,
+                publication.uidcol: row[uid_col],
+                "publication": publication.name,
                 "year": year,
             }
             dct_ls.append(dct)
     return dct_ls
-
-class RunArgs:
-    def __init__(self, **kwargs) -> None:
-        self.__dict__.update(kwargs)
-
-# runarg = RunArgs(**kwargs)
-# just use ner kwarg dictionary
 
 def run(input_df, output_name, text_col, **kwargs):
     input_df[text_col] = input_df[text_col].astype(str)
@@ -70,28 +78,31 @@ def run(input_df, output_name, text_col, **kwargs):
     nerdf.to_csv(output_name)
     return nerdf
     # print(f"{list(ent.sents)=}") # for debugging
-for year in range(2011, 2021):
-    year = 2021
-    publication = "scmp"
+
+publication = utils.publications["scmp"]
+for year in range(2011, 2020):
+    
+    df = utils.get_df(publication, f"{year}.csv")
     kwargs = {
         "year": year,
         "publication": publication,
-        "text_col": "Body",
-        "uid_col": "Index"
+        "text_col": publication.textcol,
+        "uid_col": publication.uidcol
     }
     # %%
-    nerdf = timeit(run, df, f"ner_{year}.csv", **kwargs)
+
+    nerdf = utils.timeit(run, df, f"ner_{year}.csv", **kwargs)
 
 
 # %%
 # paper = "scmp"
 # nerdf = timeit(run, df.head(1000), "ner.csv", paper, year)
-en = nerdf.iloc[0]
-body = df.loc[df.Index.eq(en.Index)].Body.squeeze()
-body
-doc = nlp(body)
-doc[en.start].sent
-en
+# en = nerdf.iloc[0]
+# body = df.loc[df.Index.eq(en.Index)].Body.squeeze()
+# body
+# doc = nlp(body)
+# doc[en.start].sent
+# en
 # %%
     # print(f"{list(ent.sents)=}")
 

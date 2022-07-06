@@ -5,5 +5,11 @@ logs/
 *.txt
 build
 thesisutils.egg-info
-scrap/
+scrap*
+.Rproj.user'
+*__pycache__/
+R/.Rproj.user/
+R/.Rdata
+R/.Rhistory
+*.RDS
 .Rproj.user
