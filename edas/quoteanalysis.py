@@ -10,46 +10,46 @@ import re
 from thesisutils import utils
 import pandas as pd
 from tqdm import tqdm
+
 tqdm.pandas()
 # %%
 publication = utils.publications["scmp"]
 
 maindf = utils.get_df(publication)
-
-df21 = utils.get_df(publication, "quotes", "q_2021.csv")
+df = utils.get_df(publication, "quotes", "q_2021.csv")
 # did a bunch of cleaning later in the script; pick up where you left off
 # by uncommenting this instead.
 # df21 = pd.read_csv("../tmp_quote21.csv")
 
-df21 = df21.merge(
-    maindf[[publication.uidcol, "Url", publication.textcol]],
-    left_on="source",
-    right_on=publication.uidcol,
-    how="left",
-)
+# df = df.merge(
+#     maindf[[publication.uidcol, "Url", publication.textcol]],
+#     left_on="source",
+#     right_on=publication.uidcol,
+#     how="left",
+# )
 
-ner21 = utils.get_df(publication, "ner", "ner_2021.csv")
+ner = utils.get_df(publication, "ner", "ner_2021.csv")
 
 # drop na speakers/entities
-df21 = df21[df21.speaker.notna()]
-ner21 = ner21[ner21.entity.notna()]
+df = df[df.speaker.notna()]
+ner = ner[ner.entity.notna()]
 
 
 # %%
 # FUNCTIONS #############################################
 def removepunct(s):
-    return re.sub(r"[^\w\s]", "", s)
+    return re.sub(r"[^\w\s]", "", str(s))
 
 
 def lookupname(quoterow):
     """Looks up a single word speaker and tries to find a full name entity.
-    
-    :param quoterow:
+
+    :param quoterow: row in dataframe with quotes in it.
     """
 
     index = quoterow["source"]  # .squeeze()
     s = quoterow["prepro_speaker"]
-    y = ner21[ner21.Index.eq(index)]
+    y = ner[ner.Index.eq(index)]
     # NOTE: could do just PERSON entities?
     candidates = y[y.prepro_entity.str.contains(s)]
     if len(candidates) == 0:
@@ -59,56 +59,82 @@ def lookupname(quoterow):
 
 
 # %%
-# remove punctuation
-df21["prepro_speaker"] = df21.speaker.str.lower().progress_apply(removepunct)
-ner21["prepro_entity"] = ner21.entity.str.lower().progress_apply(removepunct)
-
-
-ner21[ner21.prepro_entity.str.contains("biden")]
+def longspeakerpipeline(df, ner):
+    """df contains quotes/speakers, ner contains entities. 
+    Preprocesses speakers & entities; matches single word speakers to longer
+     speakers, stores in "longer speakers" column Takes 2.5 minutes to run
+    """
+    df["prepro_speaker"] = (
+        df.speaker.str.lower().
+        str.replace("’s|'s", "").
+        progress_apply(removepunct)
+    )
+    ner["prepro_entity"] = (
+        ner.entity.str.lower()
+        .str.replace("’s|'s", "")
+        .progress_apply(removepunct)
+    )
+    drops = [
+        "he",
+        "she",
+        "it",
+        "they",
+        "you",
+    ]  # "a source", "the who", "the post"],
+    # dropmask just filters for speakers who are NOT pronouns
+    # dropmask = ~df.prepro_speaker.isin(drops)
+    df["single_speaker"] = (
+        df.prepro_speaker
+        .str.split()
+        .str.len()
+        .eq(1)
+    )
+    # run on non-direct quotes and filter later. 
+    mask2 = ~df.prepro_speaker.isin(drops) & df.single_speaker# & ~df.direct
+    # match single word, non-pronoun quotes
+    df.loc[mask2, "long_speaker"] = df[mask2].progress_apply(lookupname, axis=1)
+    # add multi word speakers to long speaker column ()
+    # takes ~ 2.5 minutes
+    df.loc[~df.single_speaker] = df.loc[
+        ~df.single_speaker
+    ].prepro_speaker
+    return df
 # %%
-# get direct quotes only
-
-# quote type scheme:
-# V: Verb
-# S: Subject
-# C: Content
-# Q: Quotation mark
-
-df21["direct"] = df21.quote_type.str.contains("QCQ")
-df21["quote_type"].value_counts()
+# for year in range(2011, 2022):
+df = utils.get_df(publication, "quotes", f"quotes_full.csv")
+ner = utils.get_df(publication, "ner", f"ner_full.csv")
+df2 = longspeakerpipeline(df, ner)
+df2[[
+    # "speaker_index", 
+    "long_speaker",
+    "prepro_speaker",
+    "source",
+    "single_speaker",
+    # "quote_index"
+    ]].to_csv(fr"C:\Users\tlebr\OneDrive - pku.edu.cn\Thesis\data\scmp\quotes\quotes_full_edits.csv")
 
 # %%
-# drop ambiguous pronouns for now.
-drops = ["he", "she", "it", "they", "you",] # "a source", "the who", "the post"], 
-dropmask = ~df21.prepro_speaker.isin(drops)
 
-# when speaker is only a single word.
-df21["single_speaker"] = df21.prepro_speaker.str.split().str.len().eq(1)
 
-# mask = (dropmask & df21.single_speaker) #  & df21.direct
-mask2 = dropmask & df21.single_speaker & ~df21.direct
-
-# assign long speaker to rows which fit mask;
-# 54310 quote records takes about 3 minutes (1 minute~18000 records)
-df21.loc[mask2, "long_speaker"] = df21[mask2].progress_apply(lookupname, axis=1)
-# for now, all the masked values are nan
 # %%
-df21.loc[~df21.single_speaker, "long_speaker"] = (
-    df21.loc[~df21.single_speaker]
-    .prepro_speaker
-)
-# df21.assign(
-#     long_speaker = lambda d: d.mask(
-#         (~d.single_speaker & d.direct),
-#         d.prepro_speaker,
-#     )
-# )
+# df2.quote_type.value_counts()
+df2[df2.prepro_speaker.str.contains("biden")]
+df2 = longspeakerpipeline(df, ner)
+df2.long_speaker.value_counts().head()
+# %%
+bidenner = ner.loc[lambda d: d.entity.str.lower().str.contains("biden")]
+
+bidenner.entity.str.replace("’s|'s", "")
+
+biden = df.loc[lambda d: d.speaker.str.lower().str.contains("biden")]
+biden.speaker.apply(lambda s: re)
+
 # %%
 # get most common single speakers we were able to find longer matches for
 (
-    df21[df21.long_speaker.str.split().str.len().gt(1)]
-    .long_speaker.value_counts()
-    .head(30)
+    df[df.long_speaker.str.split().str.len().gt(1)]
+    .long_speaker.value_counts()  # .index.str.lower().str
+    .loc[lambda s: s.index.str.lower().str.contains("biden")]
 )
 
 # TODO:
@@ -137,7 +163,20 @@ df21.loc[~df21.single_speaker, "long_speaker"] = (
 # save after lookup
 # df21[df21.speaker.eq("Chan")].long_speaker.value_counts()
 
-df21.drop(["Body", "Url", "Unnamed: 0"], axis=1).to_csv("../tmp_quote21.csv")
+# df2.drop(["Body", "Url", "Unnamed: 0"], axis=1).to_csv("../tmp_quote21.csv")
+
+# %% 
+# save longspeaker 
+year = "2021"
+df2[[
+    # "speaker_index", 
+    "long_speaker",
+    "prepro_speaker",
+    "source",
+    "single_speaker",
+    # "quote_index"
+    ]].to_csv(f"C:\Users\tlebr\OneDrive - pku.edu.cn\Thesis\data\scmp\quotes\q{year}_edits.csv")
+
 
 
 # %%
@@ -146,4 +185,9 @@ df21.drop(["Body", "Url", "Unnamed: 0"], axis=1).to_csv("../tmp_quote21.csv")
 # df21.loc[lambda d: d.quote_type.str.contains("QSCQ")]
 # # inspect QCQ pattern
 # QCQ = df21.loc[lambda d: d.quote_type.str.contains("QCQ")]
-df21[df21.long_speaker.eq("joe biden")]
+df[df.long_speaker.eq("joe biden")]
+df.loc[mask2, "long_speaker"].value_counts().head(10)
+
+# Instructions: 
+# generate proper long speakers for every year of scmp
+# get 
