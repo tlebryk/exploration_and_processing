@@ -25,3 +25,4 @@ maindf.groupby("publication").size()
 # scmp           5007
 
 # %% TTS SPLIT
+# see tts split; 50 50 so just divide above numbers in half and get rough estimate. 

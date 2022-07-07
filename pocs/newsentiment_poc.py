@@ -280,5 +280,5 @@ maindf = utils.timeit(run, publication, target)
 
 # doc.ents[0].label_ == "PERSON"
 # print(x.Body)
-maindf.head()[["debug", "negative", "positive", "neutral"]]
-maindf.head().debug.apply(print)
+maindf.tail()[["negative", "positive", "neutral"]]
+maindf.tail().debug.apply(print)
