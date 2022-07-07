@@ -13,3 +13,6 @@ R/.Rdata
 R/.Rhistory
 *.RDS
 .Rproj.user
+reports/
+!reports/README.md
+*.png
