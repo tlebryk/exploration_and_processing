@@ -109,7 +109,15 @@ more_stops<- c("group",
                "owner",
                "owners",
                "holding",
-               "holdings",
+               "holdings", 
+               "last",
+               "year",
+               "also",
+               "just", 
+               "one",
+               "next",
+               "now",
+               "another"
                # "also"
                
                )
@@ -145,11 +153,6 @@ dim(baba_wv_party)
 
 baba_nns <- nns(baba_wv_party, pre_trained = cr_glove_subset, N = 10, candidates = baba_wv_party@features, as_list = TRUE)
 
-# df$Alibaba_own
-
-baba_nns[["0"]]
-baba_nns[["1"]]
-
 # 1 1      group         1 0.686
 # 2 1      company       2 0.442
 # 3 1      companies     3 0.379
@@ -164,13 +167,52 @@ baba_nns[["1"]]
 
 # how similar is it to some words of interest? innovate doesn't have pretrained :(
 cos_sim(baba_wv_party, pre_trained = cr_glove_subset, features = c('power', 'good'), as_list = FALSE)
-
-
+library(pander)
+knitr::kable(baba_nns[["0"]])
 
 nns_ratio(x = baba_wv_party, N = 10, numerator = "1", candidates = baba_wv_party@features, pre_trained = cr_glove_subset, verbose = FALSE)
 
 baba_ncs <- ncs(x = baba_wv_party, contexts_dem = baba_dem, contexts = baba_toks, N = 5, as_list = TRUE)
 
 baba_ncs[["1"]]
-baba_ncs[["0"]]
+write.table(baba_ncs[["0"]], file='temp.txt', sep=",")
 
+
+
+
+# EMBEDDING REGRESSION ##############################
+docvars(toks)
+
+
+# figure out what my metadata is 
+model1 <- conText(formula = alibaba ~ Alibaba_own,
+                  data = toks,
+                  pre_trained = cr_glove_subset,
+                  transform = TRUE, transform_matrix = cr_transform,
+                  bootstrap = TRUE, num_bootstraps = 10,
+                  permute = TRUE, num_permutations = 100,
+                  window = 6, case_insensitive = TRUE,
+                  verbose = FALSE)
+model1
+rownames(model1)
+
+DF_wv <- model1['(Intercept)',] #
+DM_wv <- model1['(Intercept)',] + model1['Alibaba_own',] # alibaba own 1
+nns(rbind(DF_wv,DM_wv), N = 10, pre_trained = cr_glove_subset, candidates = model1@features)
+
+
+model1
+model1@normed_cofficients$p.value
+
+# TENCENT ##########################
+model2 <- conText(formula = tencent ~ Alibaba_own,
+                  data = toks,
+                  pre_trained = cr_glove_subset,
+                  transform = TRUE, transform_matrix = cr_transform,
+                  bootstrap = TRUE, num_bootstraps = 10,
+                  permute = TRUE, num_permutations = 100,
+                  window = 6, case_insensitive = TRUE,
+                  verbose = FALSE)
+DF_wv <- model2['(Intercept)',] #
+DM_wv <- model2['(Intercept)',] + model1['Alibaba_own',] # alibaba own 1
+nns(rbind(DF_wv,DM_wv), N = 10, pre_trained = cr_glove_subset, candidates = model2@features)

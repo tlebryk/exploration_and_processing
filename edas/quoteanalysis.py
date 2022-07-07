@@ -28,7 +28,7 @@ df = utils.get_df(publication, "quotes", "q_2021.csv")
 #     how="left",
 # )
 
-ner = utils.get_df(publication, "ner", "ner_2021.csv")
+# ner = utils.get_df(publication, "ner", "ner_2021.csv")
 
 # drop na speakers/entities
 df = df[df.speaker.notna()]
@@ -95,12 +95,20 @@ def longspeakerpipeline(df, ner):
     df.loc[mask2, "long_speaker"] = df[mask2].progress_apply(lookupname, axis=1)
     # add multi word speakers to long speaker column ()
     # takes ~ 2.5 minutes
-    df.loc[~df.single_speaker] = df.loc[
+    df.loc[~df.single_speaker, "long_speaker"] = df.loc[
         ~df.single_speaker
     ].prepro_speaker
     return df
 # %%
-# for year in range(2011, 2022):
+dfls = (
+    pd.read_csv(fr"C:\Users\tlebr\OneDrive - pku.edu.cn\Thesis\data\scmp\quotes\q{year}_edits.csv") for year in range(2011, 2022)
+)
+pd.concat(dfls).to_csv(r"C:\Users\tlebr\OneDrive - pku.edu.cn\Thesis\data\scmp\quotes\quotes_full_edits.csv")
+utils.upload_s3(r"C:\Users\tlebr\OneDrive - pku.edu.cn\Thesis\data\scmp\quotes\quotes_full_edits.csv",
+    key="scmp\quotes\quotes_full_edits.csv",
+)
+
+# %%
 df = utils.get_df(publication, "quotes", f"quotes_full.csv")
 ner = utils.get_df(publication, "ner", f"ner_full.csv")
 df2 = longspeakerpipeline(df, ner)
@@ -190,4 +198,17 @@ df.loc[mask2, "long_speaker"].value_counts().head(10)
 
 # Instructions: 
 # generate proper long speakers for every year of scmp
-# get 
+# This takes 1-2 hours per publication. 
+#       can I run this on Sagemaker?
+# get speaker index relative to entire index of article
+# subset to only HK protest coverage, legco election coverage, carrie lam coverage? Using tags? 
+# look at who gets quoted in these (how big is hk protest?)
+# metric one: earliest mention of quote by:
+#   Carrie Lam
+#   police chief
+#   opposition ppl? Joshua Wong, Martin Lee, Benny Tai, Agnes Chau, Nathan Law, 
+# metric two: unweighted words given by
+#   Carrie Lam
+#   police chief
+
+# other stream of info: how long does poli scores for sentiment take for all Alibaba references? 
