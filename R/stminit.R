@@ -9,7 +9,7 @@ library(stm)
 library(quanteda)
 library(glue)
 library(ggplot2)
-
+library(sjPlot)
 # library(aws.s3)
 
 source("textProcessor.R")
@@ -601,14 +601,33 @@ sglabs$cov.betas
 # ALIBABA /TECH TOPIC ANALYSIS #######################
 
 tech_topic <- c("tech"=41)
-
+labelTopics(fitmodel, tech_topic)
 # find sage labels 
-print.sageLabels2(sglabs, tech_topic)
+print.sageLabels3(sglabs, tech_topic)
 
 # nothing all that interesting... 
+techeff <-
+  estimateEffect(
+    tech_topic ~ Publication + s(Year) + Alibaba_own,
+    stmobj = fitmodel,
+    metadata = out$meta,
+    uncertainty = "Global"
+  )
 
+str(techeff)
 
+print.summary.estimateEffect(techeff, topics = techeff$topics)
+summm <- summary(techeff)
+for (i in 1:length(summm$tables)) {
+  print(display_tab(summm$tables[i], summm$topics[i]))
+}
 
+round(summm$tables[1], 2)
+
+is.num <- sapply(summm$tables[1], is.numeric)
+summm$tables[1][is.num] <- lapply(summm$tables[1][is.num], round, 3)
+
+write.table(summm$tables[1], file='temp.txt', sep=";")
 # SCRATCH FNS ######################################
 
 

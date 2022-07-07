@@ -1,7 +1,6 @@
 """
 If you're working on different machines, overwrite the ROOTPATH to whatever path you have on your machine.
 """
-from codecs import ignore_errors
 import re
 
 import boto3
@@ -125,7 +124,7 @@ def read_df_s3(object_key, bucket="newyorktime"):
     return df
 
 
-def standardize(df: pd.DataFrame, pub: Publication):
+def standardize(df: pd.DataFrame, pub: Publication, drop_dups=True):
     """Standardizes column values for following columns:
         - Art_id
         - Body
@@ -139,8 +138,9 @@ def standardize(df: pd.DataFrame, pub: Publication):
             Publication=pub.name,
         )
         .drop("Unnamed: 0", axis=1, errors="ignore")
-        .drop_duplicates("Art_id")
     )
+    if drop_dups:
+        df = df.drop_duplicates("Art_id")
     return df
 
 

@@ -14,19 +14,22 @@ Solution:
     - Coref res would affect: quote attribution, NER (sorta), keyword analysis (contextr), and target-based sentiment. 
 """
 # %%
+# takes 2 minutes to load target sentiment classifier
 import logging
 import os
 import pandas as pd
 import spacy
 from NewsSentiment import TargetSentimentClassifier
 from NewsSentiment.customexceptions import TooLongTextException
+
 # , TargetNotFoundException
 from thesisutils import utils
 from tqdm import tqdm
 
+# %%
 tsc = TargetSentimentClassifier()
 
-# sample sentences: 
+# sample sentences:
 # sentiment = tsc.infer_from_text("I don't like", "Robert.", "")
 # print(sentiment[0])
 # sentiment = tsc.infer_from_text("" ,"Mark Meadows", "'s coverup of Trump’s coup attempt is falling apart.")
@@ -44,29 +47,29 @@ def span_clean(span):
     """
     span is a spacy span e.g. doc[1:14];
     default is to return span.text,
-    but if we see a "Post" reference, 
-    remove that clause before text conversion. 
+    but if we see a "Post" reference,
+    remove that clause before text conversion.
     """
     delimiters = [",", "(", "-", ")"]
     delim_idx = []
     for tok in span:
         if tok.text in delimiters:
-            delim_idx.append(tok.i-span.start)
+            delim_idx.append(tok.i - span.start)
     if delim_idx:
         ls = []
-        subspan = span[:delim_idx[0]]
+        subspan = span[: delim_idx[0]]
         if not "Post" in subspan.text:
             ls.append(subspan)
         for i, el in enumerate(delim_idx):
-            if i+1 == len(delim_idx):
+            if i + 1 == len(delim_idx):
                 subspan = span[el:]
                 if not "Post" in subspan.text:
                     ls.append(subspan)
             else:
-                subspan = span[el:delim_idx[i+1]]
+                subspan = span[el : delim_idx[i + 1]]
                 if "Post" in subspan.text:
                     continue
-                ls.append(span[el:delim_idx[i+1]])
+                ls.append(span[el : delim_idx[i + 1]])
         return "".join(e.text for e in ls)
     else:
         if "Post" in span.text:
@@ -75,14 +78,15 @@ def span_clean(span):
             return span.text
 
 
-
 # %%
+# NOTE: these functions take a standardized df; 
+# STANDARDIZE IN FIRST LOADING STEP BEFORE passing to fns. 
 def get_sentiment(row, doc, publication):
     """
-    returns dictionary with positive, negative, and neutral 
-        probabilities for a given NER object. 
-    Note: result has nan values when input is too long. 
-    Be sure to do exploration / reporting later. 
+    returns dictionary with positive, negative, and neutral
+        probabilities for a given NER object.
+    Note: result has nan values when input is too long.
+    Be sure to do exploration / reporting later.
     :param row: row of NER datafarme
     :param doc: spacy nlped (w/ sentencizer) doc
     """
@@ -106,15 +110,15 @@ def get_sentiment(row, doc, publication):
         "ner_index": row._name,
         "publication": publication.name,
         "sentence": sent,
-        publication.uidcol: row[publication.uidcol],
+       "Art_id": row["Art_id"],
     }
     # return result
-    result[publication.uidcol] = row[publication.uidcol]
-    result['debug'] = " ".join(tup)
+    result["Art_id"] = row["Art_id"]
+    result["debug"] = " ".join(tup)
     labels = ["negative", "neutral", "positive"]
     try:
         sentiment = tsc.infer_from_text(*tup)
-        # might need to add could not find target too. 
+        # might need to add could not find target too.
     except TooLongTextException as e:
         logging.warning("TOO LONG?", e)
         result.update({label: None for label in labels})
@@ -130,49 +134,71 @@ def get_sentiment(row, doc, publication):
 
     return result
 
+
 def getsent2(row, df_target, publication):
     """Basically wrapper around get_sentiment to set doc variable."""
     doc = nlp(
-        df_target.loc[row.Index][publication.textcol],
+        df_target.loc[row.Art_id]["Body"],
         disable=["tagger", "parser", "attribute_ruler", "lemmatizer", "ner"],
     )
     return get_sentiment(row, doc, publication)
-    
+
+
 def save(publication, target, df):
     key = f"{publication.name}/sentiment/{target}.csv"
     path = os.path.join(utils.ROOTPATH, key)
     logging.info("saving %s", key)
     if not os.path.exists(os.path.dirname(path)):
         os.makedirs(os.path.dirname(path))
-        df.to_csv(path)
-        utils.upload_s3(path, key=key)
+    df.to_csv(path)
+    utils.upload_s3(path, key=key)
+
 
 # %%
-def run(publication, target):
-    nerdf = utils.get_df(publication, "ner", "ner_full.csv")
-    df = utils.get_df(publication)
-    df = df.set_index("Index")
+def run(publication, target, sample=False):
+    """ Performs sentiment analysis on 
+    :param sample: subsets data to just 10% train split. 
+    """
+    nerdf = utils.standardize(
+        utils.get_df(publication, "ner", "ner_full.csv"), publication, drop_dups=False
+    )
+    df = utils.standardize(utils.get_df(publication), publication)
+    df = df.set_index("Art_id")
+    if sample:
+        tts = utils.standardize(
+            utils.get_df(publication, "tts_mask", "train_main1.csv"), publication
+        )
+        df = df[df.index.isin(tts.Art_id)]
+        nerdf = nerdf[nerdf.Art_id.isin(tts.Art_id)]
+        # nerdf.Art_id.value_counts()
     # filter maindf for only cases where baba shows up;
+    # takes 1.5 minutes to filter
     mask = nerdf.entity.astype(str).str.lower().str.contains(target)
     ner_target = nerdf[mask]
-    # filter nerdf for only cases entity has baba
-    mask2 = df[publication.textcol].astype(str).str.lower().str.contains(target)
+    # scmp has 12627 entities to look up;
+    # ~1000 training examples
+    print(f"working on {len(ner_target)} entities")
+    # masking main df takes 23 s
+    mask2 = df["Body"].astype(str).str.lower().str.contains(target)
     df_target = df[mask2]
-    rows = ner_target.progress_apply(lambda row: getsent2(row, df_target, publication), axis=1)
+    print(f"working on {len(df_target)} documents")
+    # 5007 documents with alibaba total; 432 in training set.
+    # 1.5-2s per iteration = 5 hours to run on full;30m-1 hr on subset
+    rows = ner_target.progress_apply(
+        lambda row: getsent2(row, df_target, publication), axis=1
+    )
     maindf = pd.json_normalize(rows)
     save(publication, target, maindf)
     return maindf
+
 
 # %%
 target = "alibaba"
 publication = utils.publications["scmp"]
 maindf = utils.timeit(run, publication, target)
-# sanity check the post removal works. 
+# sanity check the post removal works.
 # y = maindf.sentence.str.contains("Post")
 # y.apply(lambda d: print(d.debug, "\n", d.sentence, "\n new \n"), axis=1)
-
-
-
 
 # %%
 # GROUP APPROACH SLIGHTLY SLOWER? ########################################
@@ -254,3 +280,5 @@ maindf = utils.timeit(run, publication, target)
 
 # doc.ents[0].label_ == "PERSON"
 # print(x.Body)
+maindf.head()[["debug", "negative", "positive", "neutral"]]
+maindf.head().debug.apply(print)
