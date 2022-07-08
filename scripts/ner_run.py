@@ -139,12 +139,12 @@ def ner_run_baba(pub, local=True, outputkey=None):
     # s3 key
     outputkey = f"{pub.name}/ner/ner_full.csv"
     output_name = os.path.join(utils.ROOTPATH, "baba", outputkey)
-    if not os.path.exists(output_name):
+    if not os.path.exists(os.path.dirname(output_name)):
         os.makedirs(os.path.dirname(output_name))
     nerdf = utils.timeit(run, df, output_name, **kwargs)
     utils.df_to_s3(nerdf, outputkey)
 # %%
 pub = utils.publications['nyt']
-ner_run(pub, False)
+ner_run_baba(pub, False)
 
 

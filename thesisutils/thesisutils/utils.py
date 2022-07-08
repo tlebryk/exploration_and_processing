@@ -57,6 +57,7 @@ def upload_s3(filepath, bucket="newyorktime", key=None):
     if not key:
         key = filepath
     try:
+        logger.info("uploading from %s to %s : %s", filepath, bucket, key)
         response = s3.upload_file(filepath, bucket, key)
         return response
     except ClientError as e:
@@ -65,6 +66,7 @@ def upload_s3(filepath, bucket="newyorktime", key=None):
 
 def df_to_s3(df, key, bucket="newyorktime"):
     """Directly saves a dataframe to a csv on s3 without saving locally."""
+    logger.info("uploading to s3://%s/%s", bucket, key)
     csv_buffer = StringIO()
     df.to_csv(csv_buffer)
     s3_resource = boto3.resource("s3")
@@ -117,6 +119,7 @@ def read_df_s3(object_key, bucket="newyorktime"):
     """Reads a csv from s3 and loads into pandas;
     Means do not have to store large files locally anymore.
     """
+    logger.info("reading from s3://%s/%s", bucket, object_key)
     csv_obj = s3.get_object(Bucket=bucket, Key=object_key)
     body = csv_obj["Body"]
     csv_string = body.read().decode("utf-8")

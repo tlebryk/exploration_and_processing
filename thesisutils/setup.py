@@ -1,8 +1,8 @@
 import setuptools
 
 setuptools.setup(name='thesisutils',
-version='0.3.4',
-description='Add maindateload',
+version='0.3.5',
+description='s3 logging',
 url='#',
 author='Theo',
 install_requires=[
