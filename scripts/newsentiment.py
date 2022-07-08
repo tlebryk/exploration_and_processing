@@ -73,8 +73,8 @@ def span_clean(span):
 
 
 # %%
-# NOTE: these functions take a standardized df; 
-# STANDARDIZE IN FIRST LOADING STEP BEFORE passing to fns. 
+# NOTE: these functions take a standardized df;
+# STANDARDIZE IN FIRST LOADING STEP BEFORE passing to fns.
 def get_sentiment(row, doc, publication):
     """
     returns dictionary with positive, negative, and neutral
@@ -104,7 +104,7 @@ def get_sentiment(row, doc, publication):
         "ner_index": row._name,
         "publication": publication.name,
         "sentence": sent,
-       "Art_id": row["Art_id"],
+        "Art_id": row["Art_id"],
     }
     # return result
     result["Art_id"] = row["Art_id"]
@@ -135,7 +135,7 @@ def get_sentiment(row, doc, publication):
 
 def getsent2(row, df_target, publication):
     """Basically wrapper around get_sentiment to set doc variable.
-    :param row: entity row. 
+    :param row: entity row.
     """
     try:
         doc = nlp(
@@ -145,7 +145,9 @@ def getsent2(row, df_target, publication):
         return get_sentiment(row, doc, publication)
     except Exception as e:
         logger.warning(e)
-        logging.warning("exception encountered on article %s index %s", row.Art_id, row._name)
+        logging.warning(
+            "exception encountered on article %s index %s", row.Art_id, row._name
+        )
         result = {
             "ner_index": row._name,
             "publication": publication.name,
@@ -156,9 +158,10 @@ def getsent2(row, df_target, publication):
         result.update({label: None for label in labels})
         return result
 
+
 def save(key, maindf, bucket="newyorktime"):
     # key = f"{publication.name}/sentiment/{target}_test.csv"
-    path = os.path.join(utils.ROOTPATH, "baba", key) # NOTE: baba in path.
+    path = os.path.join(utils.ROOTPATH, "baba", key)  # NOTE: baba in path.
     logger.info("saving %s", key)
     if not os.path.exists(os.path.dirname(path)):
         os.makedirs(os.path.dirname(path))
@@ -169,19 +172,21 @@ def save(key, maindf, bucket="newyorktime"):
 
 # %%
 def run(pub, target, tts="full", bucket="newyorktime"):
-    """ Performs sentiment analysis on publications ner
-    :param sample: subsets data to just 10% train split. 
-    :param tts: train test split: 'full', 'train', or 'test'. 
-        train or test will filter for just that mask. 
+    """Performs sentiment analysis on publications ner
+    :param sample: subsets data to just 10% train split.
+    :param tts: train test split: 'full', 'train', or 'test'.
+        train or test will filter for just that mask.
     """
-    logger.info(tts)
     # todo: get df from s3
     nerdf = utils.standardize(
         utils.read_df_s3(f"{pub.name}/ner/ner_full.csv", bucket),
         # utils.get_df(pub, "ner", "ner_full.csv"),
-        pub, drop_dups=False
+        pub,
+        drop_dups=False,
     )
-    df = utils.standardize(utils.read_df_s3(f"{pub.name}/{pub.name}_full.csv", bucket), pub)
+    df = utils.standardize(
+        utils.read_df_s3(f"{pub.name}/{pub.name}_full.csv", bucket), pub
+    )
     df = df.set_index("Art_id")
     if tts != "full":
         split = utils.standardize(
@@ -203,9 +208,7 @@ def run(pub, target, tts="full", bucket="newyorktime"):
     logger.info(f"working on {len(df_target)} documents")
     # 5007 documents with alibaba total; 432 in training set.
     # 1.5-2s per iteration = 5 hours to run on full;30m-1 hr on subset
-    rows = ner_target.progress_apply(
-        lambda row: getsent2(row, df_target, pub), axis=1
-    ) 
+    rows = ner_target.progress_apply(lambda row: getsent2(row, df_target, pub), axis=1)
     maindf = pd.json_normalize(rows)
     key = f"{pub.name}/sentiment/{target}_{tts}.csv"
     save(key, maindf, bucket)
@@ -214,27 +217,27 @@ def run(pub, target, tts="full", bucket="newyorktime"):
 
 # %%
 target = "alibaba"
-bucket='aliba'
+bucket = "aliba"
 
 # %%
 pub = utils.publications["hkfp"]
-maindf = utils.timeit(run, pub,  target,"full", bucket)
+maindf = utils.timeit(run, pub, target, "train", bucket)
 print(maindf.head())
 # %%
 pub = utils.publications["nyt"]
-maindf = utils.timeit(run, pub, target,"full", bucket)
+maindf = utils.timeit(run, pub, target, "train", bucket)
 print(maindf.head())
 # %%
 pub = utils.publications["globaltimes"]
-maindf = utils.timeit(run, pub,  target,"full", bucket)
+maindf = utils.timeit(run, pub, target, "train", bucket)
 print(maindf.head())
-# %% 
+# %%
 pub = utils.publications["scmp"]
-maindf = utils.timeit(run, pub, target,"full", bucket)
+maindf = utils.timeit(run, pub, target, "train", bucket)
 print(maindf.head())
 # %%
 pub = utils.publications["chinadaily"]
-maindf = utils.timeit(run, pub, target,"full", bucket)
+maindf = utils.timeit(run, pub, target, "train", bucket)
 print(maindf.head())
 # sanity check the post removal works.
 # y = maindf.sentence.str.contains("Post")
@@ -243,22 +246,22 @@ print(maindf.head())
 # %%
 # GROUP APPROACH SLIGHTLY SLOWER? ########################################
 # groups = ner_target.groupby("Art_id")
-    # dfls = []
-    # groups = ner_target.groupby("Art_id")
-    # for name, group in tqdm(list(groups)):
-    #     # if name == 876073:
-    #         print(name)
-    #         doc = nlp(
-    #             df_target.loc[name]["Body"],
-    #             disable=["tagger", "parser", "attribute_ruler", "lemmatizer", "ner"],
-    #         )
-    # mask = group.entity.str.lower().str.contains("alibaba")
-    # filtered = group[mask]
-    # if len(filtered) > 0:
-            # res = group.progress_apply(lambda row: get_sentiment(row, doc, pub), axis=1)
-            # resdf = pd.json_normalize(res)
-            # dfls.append(resdf)
-    # maindf = pd.concat(dfls)
+# dfls = []
+# groups = ner_target.groupby("Art_id")
+# for name, group in tqdm(list(groups)):
+#     # if name == 876073:
+#         print(name)
+#         doc = nlp(
+#             df_target.loc[name]["Body"],
+#             disable=["tagger", "parser", "attribute_ruler", "lemmatizer", "ner"],
+#         )
+# mask = group.entity.str.lower().str.contains("alibaba")
+# filtered = group[mask]
+# if len(filtered) > 0:
+# res = group.progress_apply(lambda row: get_sentiment(row, doc, pub), axis=1)
+# resdf = pd.json_normalize(res)
+# dfls.append(resdf)
+# maindf = pd.concat(dfls)
 # len(list(groups))
 # %%
 # name
@@ -337,4 +340,3 @@ print(maindf.head())
 # print(x.Body)
 maindf.tail()[["negative", "positive", "neutral"]]
 maindf.tail().debug.apply(print)
-
