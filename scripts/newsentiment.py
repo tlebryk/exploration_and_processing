@@ -15,9 +15,7 @@ import os
 import pandas as pd
 import spacy
 from NewsSentiment import TargetSentimentClassifier
-from NewsSentiment.customexceptions import TooLongTextException
-
-# , TargetNotFoundException
+from NewsSentiment.customexceptions import TooLongTextException, TargetNotFoundException
 from thesisutils import utils
 from tqdm import tqdm
 
@@ -119,6 +117,10 @@ def get_sentiment(row, doc, publication):
         logging.warning("TOO LONG?", e)
         result.update({label: None for label in labels})
         return result
+    except TargetNotFoundException as e2:
+        logging.warning("TOO TARGET NOT FOUND?", e2)
+        result.update({label: None for label in labels})
+        return result
     result.update(
         {
             label: dct["class_prob"]
@@ -132,41 +134,62 @@ def get_sentiment(row, doc, publication):
 
 
 def getsent2(row, df_target, publication):
-    """Basically wrapper around get_sentiment to set doc variable."""
-    doc = nlp(
-        df_target.loc[row.Art_id]["Body"],
-        disable=["tagger", "parser", "attribute_ruler", "lemmatizer", "ner"],
-    )
-    return get_sentiment(row, doc, publication)
+    """Basically wrapper around get_sentiment to set doc variable.
+    :param row: entity row. 
+    """
+    try:
+        doc = nlp(
+            df_target.loc[row.Art_id]["Body"],
+            disable=["tagger", "parser", "attribute_ruler", "lemmatizer", "ner"],
+        )
+        return get_sentiment(row, doc, publication)
+    except Exception as e:
+        logger.warning(e)
+        logging.warning("exception encountered on article %s index %s", row.Art_id, row._name)
+        result = {
+            "ner_index": row._name,
+            "publication": publication.name,
+            "sentence": "",
+            "Art_id": row["Art_id"],
+        }
+        labels = ["negative", "neutral", "positive"]
+        result.update({label: None for label in labels})
+        return result
 
-
-def save(publication, target, df):
-    key = f"{publication.name}/sentiment/{target}.csv"
-    path = os.path.join(utils.ROOTPATH, key)
-    logging.info("saving %s", key)
+def save(key, maindf, bucket="newyorktime"):
+    # key = f"{publication.name}/sentiment/{target}_test.csv"
+    path = os.path.join(utils.ROOTPATH, "baba", key) # NOTE: baba in path.
+    logger.info("saving %s", key)
     if not os.path.exists(os.path.dirname(path)):
         os.makedirs(os.path.dirname(path))
-    df.to_csv(path)
-    utils.upload_s3(path, key=key)
+    maindf.to_csv(path)
+    logger.info("uploading to %s/%s", bucket, key)
+    utils.upload_s3(path, bucket, key)
 
 
 # %%
-def run(pub, target, sample=False):
-    """ Performs sentiment analysis on 
+def run(pub, target, tts="full", bucket="newyorktime"):
+    """ Performs sentiment analysis on publications ner
     :param sample: subsets data to just 10% train split. 
+    :param tts: train test split: 'full', 'train', or 'test'. 
+        train or test will filter for just that mask. 
     """
+    logger.info(tts)
+    # todo: get df from s3
     nerdf = utils.standardize(
-        utils.get_df(pub, "ner", "ner_full.csv"), pub, drop_dups=False
+        utils.read_df_s3(f"{pub.name}/ner/ner_full.csv", bucket),
+        # utils.get_df(pub, "ner", "ner_full.csv"),
+        pub, drop_dups=False
     )
-    df = utils.standardize(utils.get_df(pub), pub)
+    df = utils.standardize(utils.read_df_s3(f"{pub.name}/{pub.name}_full.csv", bucket), pub)
     df = df.set_index("Art_id")
-    if sample:
-        tts = utils.standardize(
-            utils.get_df(pub,"baba", "tts_mask", "train_main1.csv"), pub
+    if tts != "full":
+        split = utils.standardize(
+            utils.read_df_s3(f"{pub.name}/tts_mask/{tts}_main1.csv", bucket), pub
         )
-        df = df[df.index.isin(tts.Art_id)]
-        nerdf = nerdf[nerdf.Art_id.isin(tts.Art_id)]
-        # nerdf.Art_id.value_counts()
+        df = df[df.index.isin(split.Art_id)]
+        nerdf = nerdf[nerdf.Art_id.isin(split.Art_id)]
+
     # filter maindf for only cases where baba shows up;
     # takes 1.5 minutes to filter
     mask = nerdf.entity.astype(str).str.lower().str.contains(target)
@@ -182,24 +205,60 @@ def run(pub, target, sample=False):
     # 1.5-2s per iteration = 5 hours to run on full;30m-1 hr on subset
     rows = ner_target.progress_apply(
         lambda row: getsent2(row, df_target, pub), axis=1
-    )
+    ) 
     maindf = pd.json_normalize(rows)
-    save(pub, target, maindf)
+    key = f"{pub.name}/sentiment/{target}_{tts}.csv"
+    save(key, maindf, bucket)
     return maindf
 
 
 # %%
 target = "alibaba"
-publication = utils.publications["scmp"]
-maindf = utils.timeit(run, publication, target)
+bucket='aliba'
+
+# %%
+pub = utils.publications["hkfp"]
+maindf = utils.timeit(run, pub,  target,"full", bucket)
+print(maindf.head())
+# %%
+pub = utils.publications["nyt"]
+maindf = utils.timeit(run, pub, target,"full", bucket)
+print(maindf.head())
+# %%
+pub = utils.publications["globaltimes"]
+maindf = utils.timeit(run, pub,  target,"full", bucket)
+print(maindf.head())
+# %% 
+pub = utils.publications["scmp"]
+maindf = utils.timeit(run, pub, target,"full", bucket)
+print(maindf.head())
+# %%
+pub = utils.publications["chinadaily"]
+maindf = utils.timeit(run, pub, target,"full", bucket)
+print(maindf.head())
 # sanity check the post removal works.
 # y = maindf.sentence.str.contains("Post")
 # y.apply(lambda d: print(d.debug, "\n", d.sentence, "\n new \n"), axis=1)
 
 # %%
 # GROUP APPROACH SLIGHTLY SLOWER? ########################################
-# groups = ner_baba.groupby(publication.uidcol)
-
+# groups = ner_target.groupby("Art_id")
+    # dfls = []
+    # groups = ner_target.groupby("Art_id")
+    # for name, group in tqdm(list(groups)):
+    #     # if name == 876073:
+    #         print(name)
+    #         doc = nlp(
+    #             df_target.loc[name]["Body"],
+    #             disable=["tagger", "parser", "attribute_ruler", "lemmatizer", "ner"],
+    #         )
+    # mask = group.entity.str.lower().str.contains("alibaba")
+    # filtered = group[mask]
+    # if len(filtered) > 0:
+            # res = group.progress_apply(lambda row: get_sentiment(row, doc, pub), axis=1)
+            # resdf = pd.json_normalize(res)
+            # dfls.append(resdf)
+    # maindf = pd.concat(dfls)
 # len(list(groups))
 # %%
 # name
@@ -207,10 +266,10 @@ maindf = utils.timeit(run, publication, target)
 # dfls = []
 
 # ner_baba
-
+# ner_target.Art_id.eq(876073).value_counts()
 # for name, group in list(groups)[:5]:
 #     doc = nlp(
-#         df_baba.loc[name][publication.textcol],
+#         df_target.loc[name]["Body"],
 #         disable=["tagger", "parser", "attribute_ruler", "lemmatizer", "ner"],
 #     )
 #     # mask = group.entity.str.lower().str.contains("alibaba")
@@ -219,7 +278,7 @@ maindf = utils.timeit(run, publication, target)
 #     res = group.apply(lambda row: get_sentiment(row, doc), axis=1)
 #     resdf = pd.json_normalize(res)
 #     dfls.append(resdf)
-# takes 30 seconds to run on 5 groups which is 18 entities
+# # takes 30 seconds to run on 5 groups which is 18 entities
 
 # very slow for now...
 # but does get sentiment for each relevant entity;
@@ -235,7 +294,7 @@ maindf = utils.timeit(run, publication, target)
 # import pandas as pd
 # import neuralcoref
 # %%
-# COREFF APPORACH OLD
+# COREFF APPORACH OLD######################################
 # import spacy
 
 # logging.basicConfig(level=logging.INFO)
@@ -278,3 +337,4 @@ maindf = utils.timeit(run, publication, target)
 # print(x.Body)
 maindf.tail()[["negative", "positive", "neutral"]]
 maindf.tail().debug.apply(print)
+
