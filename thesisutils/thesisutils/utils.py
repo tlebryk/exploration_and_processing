@@ -115,10 +115,15 @@ def timeit(fn, *args, **kwargs):
     return ret
 
 
-def read_df_s3(object_key, bucket="newyorktime"):
+def read_df_s3(object_key, bucket="newyorktime", pubdefault=None):
     """Reads a csv from s3 and loads into pandas;
     Means do not have to store large files locally anymore.
+    :param pubdefault: pass a publication and overrides object_key 
+        fn to just read the main df from that publication.
+        lazy and hacky but deal with it. 
     """
+    if pubdefault:
+        object_key = f"{pubdefault.name}/{pubdefault.name}_full.csv"
     logger.info("reading from s3://%s/%s", bucket, object_key)
     csv_obj = s3.get_object(Bucket=bucket, Key=object_key)
     body = csv_obj["Body"]

@@ -1,8 +1,8 @@
 import setuptools
 
 setuptools.setup(name='thesisutils',
-version='0.3.5',
-description='s3 logging',
+version='0.3.6',
+description='change s3 read signature to allow default read to main df',
 url='#',
 author='Theo',
 install_requires=[
