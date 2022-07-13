@@ -78,11 +78,20 @@ def get_perc(a, b):
     return round(a / (a + b), 3) * 100
 
 
-def report(a, b):
-    """prints: a/a+b as percent and full fraction & returns"""
+def report(a, b, preprint="", postprint=""):
+    """prints: a/a+b as percent and full fraction & returns
+    :param a: numerator
+    :param b: remaining value added to a for demonenator
+    :param preprint: str to print before fraction report
+    :param postpring: str to print acter fraction report 
+    """
     perc = get_perc(a, b)
+    if preprint:
+        print(preprint)
     print(perc, "%")
     print(a, "/", a + b)
+    if postprint:
+        print(postprint)
     return perc
 
 
@@ -150,6 +159,16 @@ def standardize(df: pd.DataFrame, pub: Publication, drop_dups=True):
     if drop_dups:
         df = df.drop_duplicates("Art_id")
     return df
+
+def drop_report(df, mask):
+    """Prints number of rows dropped by a mask and returns filtered df"""
+    preprint = "Dropping rows:"
+    try:
+        report(mask.value_counts().loc[False], len(df), preprint)
+    except KeyError as ke:
+        print("nothing to drop")
+    return df[mask]
+    # print(f"Dropping {mask.value_counts().loc[False]} / {len(maindf)} rows ()")
 
 
 def main_date_load(pub, baba=False, *args):

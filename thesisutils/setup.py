@@ -1,8 +1,8 @@
 import setuptools
 
 setuptools.setup(name='thesisutils',
-version='0.3.6',
-description='change s3 read signature to allow default read to main df',
+version='0.3.7',
+description='Add report dropped function',
 url='#',
 author='Theo',
 install_requires=[
