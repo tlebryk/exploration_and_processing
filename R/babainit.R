@@ -37,7 +37,7 @@ fullstop <- c(mystops, polistops)
 # alibaba ownership categorical
 
 # data <-
-#   aws.s3::s3read_using(read.csv, object = glue("s3://newyorktime/{publication}/tts_mask/train_main1.csv"))
+#   aws.s3::s3read_using(read.csv, object = glue("s3://aliba/{publication}/tts_mask/train_main1.csv"))
 
 
 loaddata <- function(publication, filename = "train_main1.csv") {
@@ -53,34 +53,16 @@ loaddata <- function(publication, filename = "train_main1.csv") {
       Headline = "title" # nyt and gt?
     )
   ttsmask <-
-    # aws.s3::s3read_using(read.csv,
-    #                      object = glue(
-    #                        "s3://newyorktime/{publication}/tts_mask/train_main1.csv"
-                         # )) %>%
-    read.csv(file.path(rootpath, publication, "tts_mask", filename)) %>%
+    aws.s3::s3read_using(read.csv,
+                         object = glue("s3://aliba/{publication}/tts_mask/train_main1.csv")) %>%
+    # read.csv(file.path(rootpath, publication, "tts_mask", filename)) %>%
     rename(any_of(lookup))
   
-  polimask <-
-    # aws.s3::s3read_using(read.csv,
-    #                      object = glue("s3://newyorktime/{publication}/polimask/pmask_.csv")) %>%
-    
-    read.csv(file.path(rootpath, publication, "polimask", "pmask_.csv")) %>%
-    rename(any_of(lookup)) %>%
-    filter(poliestimation >= 0.5) %>%
-    distinct(doc_id)
-  
-  
-  hkmask <-
-    # aws.s3::s3read_using(read.csv,
-    #                      object = glue("s3://newyorktime/{publication}/hk_mask/hkmask.csv")) %>%
-    read.csv(file.path(rootpath, publication, "hk_mask", "hkmask.csv")) %>%
-    rename(any_of(lookup)) %>%
-    distinct(doc_id)
   
   full <-
-    # aws.s3::s3read_using(read.csv,
-    #                      object = glue("s3://newyorktime/{publication}/{publication}_full.csv")) %>%
-    read.csv(file.path(rootpath, publication, glue('{publication}_full.csv'))) %>%
+    aws.s3::s3read_using(read.csv,
+                         object = glue("s3://aliba/{publication}/{publication}_full.csv")) %>%
+    # read.csv(file.path(rootpath, publication, glue('{publication}_full.csv'))) %>%
     # standardize colnames
     rename(any_of(lookup)) %>%
     # deduplicate
@@ -90,40 +72,43 @@ loaddata <- function(publication, filename = "train_main1.csv") {
     mutate(
       Publication = factor(publication, levels = publications),
       text = paste(Headline, "; ", Body),
-      headlow = gsub(" ", "", tolower(Headline))
     )
   
+  
   dt <-
-    # aws.s3::s3read_using(read.csv,
-    #                      object = glue("s3://newyorktime/{publication}/date/date.csv")) %>%
-    read.csv(file.path(rootpath, publication, "date", "date.csv")) %>%
+    aws.s3::s3read_using(read.csv,
+                         object = glue("s3://aliba/{publication}/date/date.csv")) %>%
+    # read.csv(file.path(rootpath, publication, "date", "date.csv")) %>%
     rename(any_of(lookup))
   
   full %>%
     merge(ttsmask, by = "doc_id") %>%
     merge(dt, by = "doc_id") %>%
-    merge(hkmask, by = "doc_id") %>%
-    merge(polimask, by = "doc_id") %>%
-    mutate(doc_id = as.character(doc_id),
-           Alibaba_own = baba_ownership,
-           ContentPublication = factor(paste(Publication, as.integer(Year>2016), sep="_"))
-           ) %>%
-    # DEDUPLICATE SHARED HEADLINES
-    # ADD THIS TO STM INIT TOO
-  #         headlow = gsub(" ", "", tolower(Headline))
-  #         ) %>%
-  # group_by(headlow, Year) %>%
-  # filter(n() <= 1)  %>%
-  # ungroup() %>%
-  #   # comment me out later
+    mutate(
+      doc_id = as.character(doc_id),
+      Alibaba_own = baba_ownership,
+      ContentPublication = factor(paste(
+        Publication, as.integer(Year >= 2016), sep = "_"
+      )),
+      # DEDUPLICATE SHARED HEADLINES
+      # ADD THIS TO STM INIT TOO
+      headlow = gsub(" ", "", tolower(Headline))
+    ) %>%
+    group_by(headlow, Year) %>%
+    filter(n() <= 1) %>%
+    ungroup() %>%
+    # ) %>%
+    # comment me out later
     # head() %>%
-    select("doc_id",
-           "text",
-           "Year",
-           "Publication",
-           "ContentPublication",
-           "Headline",
-           "Alibaba_own")
+    select(
+      "doc_id",
+      "text",
+      "Year",
+      "Publication",
+      "ContentPublication",
+      "Headline",
+      "Alibaba_own"
+    )
 }
 
 
@@ -132,7 +117,10 @@ df <- publications %>%
   bind_rows() # %>%
 # sample_n(50)
 
-
+df2 <- df %>%
+  mutate(alicnt = str_count(text, "Ali"),
+         mentiontwice = alicnt >= 2) %>%
+  filter(alicnt >= 2)
 
 # final columns of import:
 # Author
@@ -153,22 +141,24 @@ df <- publications %>%
 # output
 
 processed <- textProcessor(
-  df$text,
+  df2$text,
   onlycharacter = TRUE,
-  metadata = df,
-  customstemmedstops = fullstop,
+  metadata = df2,
+  customstemmedstops = mystops,
 )
 out <- prepDocuments(
   processed$documents,
   processed$vocab,
   lower.thresh = length(processed$documents) * .0015,
   meta = processed$meta,
-  upper.thresh = length(processed$documents) * .9
+  # upper.thresh = length(processed$documents) * .9
+  # we want to keep baba articles right?
 )
 # docs <- out$documents
 # vocab <- out$vocab
 # meta <-out$meta
-out$meta %>% count(Year)
+out$meta %>% colnames()
+out$meta %>% count(ContentPublication) %>% summarize(sum(n))
 # prev_equation <- "~Publication + s(Year) + Alibaba_own"
 
 # FIT MODEL ###################################
@@ -176,57 +166,70 @@ out$meta %>% count(Year)
 fitmodel <- stm(
   out$documents,
   out$vocab,
-  K = 50,
+  K = 10,
   max.em.its = 75,
   data = out$meta,
   init.type = "Spectral",
   prevalence =  ~ Publication + s(Year) + Alibaba_own,
   # + as.factor(Publication)
-  content =  ~ ContentPublication, # used to be just content
+  content =  ~ ContentPublication,
+  # used to be just content
   seed = 123456,
   # gamma.prior="L1"
 )
 summary(fitmodel)
 
 
-saveRDS(fitmodel, "./fitmodel2.RDS")
-fitmodel <- readRDS("./fitmodel.RDS")
+saveRDS(fitmodel, "./fitmodelbaba.RDS")
+fitmodel <- readRDS("./fitmodelbaba.RDS")
 
-
-protest_topics <-
-  c(3, 6, 23, 31, 33, 35, 49) # drop 7: it's petty crime not geopolitical.
-names(protest_topics) <-
-  c(
-    "Legislation",
-    "Elections",
-    # "Controversial Subjects",
-    "Extradition Bill/NSL",
-    "Democracy Movement/Judiciary",
-    "One Country, Two Systems",
-    "Protests",
-    "Pro-establishment Politicians"
-  )
+fitmodel$settings
 
 # EXPLORE MODEL ################################
 
-
+findTopic(fitmodel, c("commerce"))
 
 plot.STM(fitmodel, type = "summary", n = 3)#, covarlevels = c("scmp", "chinadaily"))
 ast(express)
 
 pubtopthought <- function(p, topic = protest_topics[1]) {
-  # sad, hacky way to add current publication to namespace for 
+  # sad, hacky way to add current publication to namespace for
   # where substitute-eval pattern
   newmeta <- out$meta %>%
     mutate(pub = p)
-  findThoughts(fitmodel, df$Headline,where = Publication == pub, topics = topic,  n = 3, meta=newmeta)
-
+  findThoughts(
+    fitmodel,
+    df$Headline,
+    where = Publication == pub,
+    n = 3,
+    meta = newmeta
+  )
+  
 }
 
-pubtopplot<- function(p, topic =  protest_topics[1]){
+# deduplicate global times and china daily
+df2 %>%
+  # subset(Publication %in% c("chindadaily", "globaltimes")) %>%
+  # count(Alibaba_own) %>%
+  mutate(headlow = gsub(" ", "", tolower(Headline))) %>%
+  group_by(headlow) %>%
+  filter(n() <= 1) %>%
+  ungroup() %>%
+  # count(headlow)
+  select(c(headlow, Publication)) %>%
+  arrange(headlow)
+# findThoughts(fitmodel, df2$Headline,   n = 3, meta=out$meta)
+
+
+pubtopplot <- function(p, topic =  protest_topics[1]) {
   thoughts <- pubtopthought(p, topic)
-  plotQuote(thoughts$docs[[1]], main=p, width = 80,
-            text.cex = 2.0, cex.main=2)
+  plotQuote(
+    thoughts$docs[[1]],
+    main = p,
+    width = 80,
+    text.cex = 2.0,
+    cex.main = 2
+  )
   thoughts
 }
 
@@ -234,12 +237,26 @@ topic <- protest_topics[1]
 makeplot <- function(topic) {
   # dev.off()
   n <- 3
-  par(mfrow = c(ceiling(length(publications) / 2), 2), oma=c(0,0,2,0),
-      mar = c(1, 1, 4, 1))  
+  par(
+    mfrow = c(ceiling(length(publications) / 2), 2),
+    oma = c(0, 0, 2, 0),
+    mar = c(1, 1, 4, 1)
+  )
   topicls <- publications %>%
-    lapply(pubtopplot, topic=topic)
-  title(paste0("Figure _._: Top ", n, " headlines for topic ", topic, ": ", names(topic)), 
-        line = -1, outer = TRUE, cex.main=2.5)
+    lapply(pubtopplot, topic = topic)
+  title(
+    paste0(
+      "Figure _._: Top ",
+      n,
+      " headlines for topic ",
+      topic,
+      ": ",
+      names(topic)
+    ),
+    line = -1,
+    outer = TRUE,
+    cex.main = 2.5
+  )
 }
 
 
@@ -282,7 +299,7 @@ mtext(
 
 # labelTopics
 
-labels <- labelTopics(fitmodel, protest_topics)
+labels <- labelTopics(fitmodel)
 labels$topics
 
 summary(fitmodel)
@@ -310,7 +327,7 @@ eff <-
 
 
 display_tab <- function(tabl, topic) {
-  # Saves html of summary table with topic num and topic label. 
+  # Saves html of summary table with topic num and topic label.
   dff <- data.frame(tabl, check.names = F)
   tab_df(
     dff,
@@ -328,15 +345,15 @@ for (i in 1:length(summm$tables)) {
 }
 
 
-out$meta %>% 
+out$meta %>%
   count(Alibaba_own)
 
 
 plot(
   eff,
-  covariate="Alibaba_own",
+  covariate = "Alibaba_own",
   method = "difference",
-  topics=protest_topics,
+  topics = protest_topics,
   cov.value1 = 1,
   cov.value2 = 0,
   xlim = c(-.05, .01),
@@ -402,7 +419,7 @@ testfit <-
     newData = new$meta,
     origData = out$meta,
     prevalencePrior = "Covariate",
-    contentPrior="Covariate",
+    contentPrior = "Covariate",
     betaIndex = new$meta$Publication,
     prevalence = ~ Publication + s(Year) + Alibaba_own
     
@@ -410,7 +427,10 @@ testfit <-
 fitmodel$beta$kappa %>%
   names
 
-as.numeric(factor(new$meta$Publication, fitmodel$settings$covariates$yvarlevels)) %>%
+as.numeric(factor(
+  new$meta$Publication,
+  fitmodel$settings$covariates$yvarlevels
+)) %>%
   tail
 
 trainfit <-
@@ -516,9 +536,9 @@ prepnocovplot <-
 
 plot(
   preptest,
-  covariate="Alibaba_own",
+  covariate = "Alibaba_own",
   method = "difference",
-  topics=protest_topics,
+  topics = protest_topics,
   cov.value1 = 1,
   cov.value2 = 0,
   xlim = c(-.05, .01),
@@ -608,12 +628,12 @@ sglabs$cov.betas
 
 # ALIBABA /TECH TOPIC ANALYSIS #######################
 
-tech_topic <- c("tech"=41)
+tech_topic <- c("tech" = 41)
 labelTopics(fitmodel, tech_topic)
-# find sage labels 
+# find sage labels
 print.sageLabels3(sglabs, tech_topic)
 
-# nothing all that interesting... 
+# nothing all that interesting...
 techeff <-
   estimateEffect(
     tech_topic ~ Publication + s(Year) + Alibaba_own,
@@ -635,13 +655,16 @@ round(summm$tables[1], 2)
 is.num <- sapply(summm$tables[1], is.numeric)
 summm$tables[1][is.num] <- lapply(summm$tables[1][is.num], round, 3)
 
-write.table(summm$tables[1], file='temp.txt', sep=";")
+write.table(summm$tables[1], file = 'temp.txt', sep = ";")
 # SCRATCH FNS ######################################
 
 
 summary(fitmodel)
-plot(fitmodel, "labels", topics= protest_topics, covarlevels = c("scmp", "nyt"))
-labeledtopics <- labelTopics(fitmodel, topics=protest_topics)
+plot(fitmodel,
+     "labels",
+     topics = protest_topics,
+     covarlevels = c("scmp", "nyt"))
+labeledtopics <- labelTopics(fitmodel, topics = protest_topics)
 labeledtopics$interaction %>% names()
 
 tabl <- summm$tables[[2]]
@@ -650,9 +673,3 @@ summm$topics
 display_tab(summm$tables[2], summm$topics[2])
 i
 sjt(summm$tables[[2]])
-
-
-
-
-
-
