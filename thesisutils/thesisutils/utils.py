@@ -154,7 +154,7 @@ def standardize(df: pd.DataFrame, pub: Publication, drop_dups=True):
         .assign(
             Publication=pub.name,
         )
-        .drop("Unnamed: 0", axis=1, errors="ignore")
+        # .drop("Unnamed: 0", axis=1, errors="ignore")
     )
     if drop_dups:
         df = df.drop_duplicates("Art_id")
