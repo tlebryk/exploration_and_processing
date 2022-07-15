@@ -212,3 +212,71 @@ df.loc[mask2, "long_speaker"].value_counts().head(10)
 #   police chief
 
 # other stream of info: how long does poli scores for sentiment take for all Alibaba references? 
+
+
+# Analysis part 2 ###################
+#%% 
+cdailyq = utils.read_df_s3("chinadaily/quotes/quotes_full_edits.csv")
+cdailyq.head()#.long_speaker.value_counts().head(20)
+cdailyner = utils.read_df_s3("chinadaily/ner/ner_full.csv")
+cdailyq.iloc[1].head()
+cdailyner.loc[lambda d: d.id.eq(14361751)]
+
+cdailymain = utils.get_df(utils.publications['chinadaily'])
+cdailymain.loc[lambda d: d.id.eq("14361751")].plainText.squeeze()[800:900]
+
+# Problem: quote ner is by character index
+# normal ner is by word index 
+# solution: get character index of the ners 
+# how long will this take? 
+# perhaps sagemaker can help on this one. 
+
+import spacy
+import os
+nlp = spacy.load("en_core_web_lg")
+nlp = spacy.load("en_core_web_md")
+
+# %%
+txt = nlp(cdailymain.loc[lambda d: d.id.eq("14361751")].plainText.squeeze(), disable=["tok2vec", "tagger", "parser", "attribute_ruler", "lemmatizer", "ner"])
+# seems to work on with medium to... 
+txt[155:157].start_char
+pub = utils.publications['chinadaily']
+# for every publication
+# for pub in utils.publication.values():
+maindf = utils.get_df(pub)
+nerdf = utils.read_df_s3(f"{pub.name}/ner/ner_full.csv")
+quotedf = utils.read_df_s3(f"{pub.name}/quotes/quotes_full_edits.csv")
+nerdf[pub.uidcol] = nerdf[pub.uidcol].astype(str)
+maindf[pub.uidcol] = maindf[pub.uidcol].astype(str)
+
+# algo: for every article...
+maindf.apply(get_doc_nerchars, axis=1)
+nerdf.start_char = nerdf.start_char.astype(pd.Int64Dtype())
+nerdf.end_char = nerdf.end_char.astype(pd.Int64Dtype())
+nerdf = nerdf.rename({"Unnamed: 0": "ner_index"}, axis=1)
+path = f"../../data/{pub.name}/ner/ner_full2.csv"
+os.makedirs(os.path.dirname(path), exist_ok=True) 
+nerdf.to_csv(path)
+utils.df_to_s3(nerdf, f"{pub.name}/ner/ner_full2.csv")
+import numpy as np
+np.unique(nerdf.index == nerdf["Unnamed: 0"], return_counts=True)
+nerdf[nerdf.index != nerdf["Unnamed: 0"]]
+nerdf[21243-5:21243+5]
+nerdf[""].value_counts().sort_index()
+def get_doc_nerchars(row):
+    """Creates start and end_char columns for ner df based on 
+    token indexes of doc of current row of maindf. 
+    """
+    doc = nlp(row[pub.textcol], disable=["tok2vec", "tagger", "parser", "attribute_ruler", "lemmatizer", "ner"])
+    mask = nerdf[pub.uidcol].eq(row[pub.uidcol])
+    nerdf.loc[mask, "start_char"], nerdf.loc[mask, "end_char"] = zip(*nerdf[mask].apply(nerchar, doc=doc, axis=1))
+    
+def nerchar(nrow, doc):
+    """Gets the start/end_chars of tokens in ner."""
+    ent = doc[nrow["start"]:nrow["end"]]
+    return int(ent.start_char), int(ent.end_char)
+# get all ners 
+# get start and end token
+# save to new file we will merge on 
+# we're going to have to use ner df's index as the truthful index
+# right now it's duplicated by unnamed col 0 fwiw. 
