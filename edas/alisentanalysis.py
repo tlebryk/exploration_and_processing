@@ -287,8 +287,8 @@ def cioverlap(premean, postmean, posneg):
     return cond
 posneg = "negative"
 postmean[posneg].join(premean[posneg], lsuffix="-pre", rsuffix="-post").assign(
-    "in CI" = lambda d: cioverlap(premean, postmean, posneg)
-).style.background_gradient(subset=["in_CI"]).set_caption(f"Table _._: Mean {posneg} score from before and after purchase with standard errors")
+    **{"In CI" : lambda d: cioverlap(premean, postmean, posneg)}
+).style.background_gradient(subset=["In CI"]).set_caption(f"Table _._: Mean {posneg} score from before and after purchase with standard errors")
 
 postmean["negative"]
 
@@ -305,7 +305,7 @@ postmean
 # running did experiment
 # positivity = month effect + publication effect + treatment effect
 est2 = smf.ols(
-    formula="negative ~ C(publication) + C(monthid) +  baba_ownership", data=maindf
+    formula="neutral ~ C(publication) + C(Year) +  baba_ownership", data=maindf
 ).fit()
 est2.summary()
 print(est2.summary2(float_format="%.4f"))
