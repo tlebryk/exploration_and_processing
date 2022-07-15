@@ -237,10 +237,26 @@ nlp = spacy.load("en_core_web_lg")
 nlp = spacy.load("en_core_web_md")
 
 # %%
-txt = nlp(cdailymain.loc[lambda d: d.id.eq("14361751")].plainText.squeeze(), disable=["tok2vec", "tagger", "parser", "attribute_ruler", "lemmatizer", "ner"])
-# seems to work on with medium to... 
-txt[155:157].start_char
-pub = utils.publications['chinadaily']
+def get_doc_nerchars(row):
+    """Creates start and end_char columns for ner df based on 
+    token indexes of doc of current row of maindf. 
+    """
+    # print(row[pub.uidcol])
+    try:
+        doc = nlp(row[pub.textcol], disable=["tok2vec", "tagger", "parser", "attribute_ruler", "lemmatizer", "ner"])
+    except ValueError as ve:
+        print(row[pub.uidcol])
+        print(ve)
+        return None
+
+    mask = nerdf[pub.uidcol].eq(row[pub.uidcol])
+    nerdf.loc[mask, "start_char"], nerdf.loc[mask, "end_char"] = zip(*nerdf[mask].apply(nerchar, doc=doc, axis=1))
+    
+def nerchar(nrow, doc):
+    """Gets the start/end_chars of tokens in ner."""
+    ent = doc[nrow["start"]:nrow["end"]]
+    return ent.start_char, ent.end_char
+# %% 
 # for every publication
 # for pub in utils.publication.values():
 maindf = utils.get_df(pub)
@@ -248,33 +264,33 @@ nerdf = utils.read_df_s3(f"{pub.name}/ner/ner_full.csv")
 quotedf = utils.read_df_s3(f"{pub.name}/quotes/quotes_full_edits.csv")
 nerdf[pub.uidcol] = nerdf[pub.uidcol].astype(str)
 maindf[pub.uidcol] = maindf[pub.uidcol].astype(str)
+nerdf = nerdf.rename({"Unnamed: 0": "ner_index"}, axis=1)
+path = f"../../data/{pub.name}/ner/ner_full2.csv"
+os.makedirs(os.path.dirname(path), exist_ok=True) 
+# run in blocks of 200
+blocksize = 200
+for i in tqdm(range(0, len(maindf), blocksize)):
+    idx = maindf.iloc[i:i+blocksize][pub.uidcol]
+    maindf.iloc[i:i+blocksize].apply(get_doc_nerchars, axis=1)
+    nerdf[nerdf[pub.uidcol].isin(idx)].to_csv(f"../../data/{pub.name}/ner/ner_full{i}.csv")
+nerdf.to_csv(f"../../data/{pub.name}/ner/ner_full2.csv")
+dfls = []
+ndf = pd.concat(pd.read_csv(f"../../data/{pub.name}/ner/ner_full{i}.csv") for i in range(0, len(maindf), 500))
+path = f"../../data/{pub.name}/ner/ner_full2.csv"
+nerdf.to_csv(path)
+utils.df_to_s3(ndf, f"{pub.name}/ner/ner_full2.csv")
 
 # algo: for every article...
-maindf.apply(get_doc_nerchars, axis=1)
+maindf.progress_apply(get_doc_nerchars, axis=1)
 nerdf.start_char = nerdf.start_char.astype(pd.Int64Dtype())
 nerdf.end_char = nerdf.end_char.astype(pd.Int64Dtype())
-nerdf = nerdf.rename({"Unnamed: 0": "ner_index"}, axis=1)
 path = f"../../data/{pub.name}/ner/ner_full2.csv"
 os.makedirs(os.path.dirname(path), exist_ok=True) 
 nerdf.to_csv(path)
 utils.df_to_s3(nerdf, f"{pub.name}/ner/ner_full2.csv")
-import numpy as np
-np.unique(nerdf.index == nerdf["Unnamed: 0"], return_counts=True)
-nerdf[nerdf.index != nerdf["Unnamed: 0"]]
-nerdf[21243-5:21243+5]
-nerdf[""].value_counts().sort_index()
-def get_doc_nerchars(row):
-    """Creates start and end_char columns for ner df based on 
-    token indexes of doc of current row of maindf. 
-    """
-    doc = nlp(row[pub.textcol], disable=["tok2vec", "tagger", "parser", "attribute_ruler", "lemmatizer", "ner"])
-    mask = nerdf[pub.uidcol].eq(row[pub.uidcol])
-    nerdf.loc[mask, "start_char"], nerdf.loc[mask, "end_char"] = zip(*nerdf[mask].apply(nerchar, doc=doc, axis=1))
-    
-def nerchar(nrow, doc):
-    """Gets the start/end_chars of tokens in ner."""
-    ent = doc[nrow["start"]:nrow["end"]]
-    return int(ent.start_char), int(ent.end_char)
+
+# %%
+maindf.loc[lambda d: d[pub.uidcol].eq("13996059")]
 # get all ners 
 # get start and end token
 # save to new file we will merge on 
