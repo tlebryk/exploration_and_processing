@@ -250,10 +250,17 @@ def get_doc_nerchars(row):
         return None
 
     mask = nerdf[pub.uidcol].eq(row[pub.uidcol])
-    nerdf.loc[mask, "start_char"], nerdf.loc[mask, "end_char"] = zip(*nerdf[mask].apply(nerchar, doc=doc, axis=1))
+    try:
+        nerdf.loc[mask, "start_char"], nerdf.loc[mask, "end_char"] = zip(*nerdf[mask].apply(nerchar, doc=doc, axis=1))
+    except ValueError as ve:
+        print(row[pub.uidcol])
+        print(ve)
+        return None
+        
     
 def nerchar(nrow, doc):
     """Gets the start/end_chars of tokens in ner."""
+    # print(nrow.ner_index)
     ent = doc[nrow["start"]:nrow["end"]]
     return ent.start_char, ent.end_char
 # %% 
@@ -268,18 +275,21 @@ nerdf = nerdf.rename({"Unnamed: 0": "ner_index"}, axis=1)
 path = f"../../data/{pub.name}/ner/ner_full2.csv"
 os.makedirs(os.path.dirname(path), exist_ok=True) 
 # run in blocks of 200
+start =0
 blocksize = 200
-for i in tqdm(range(0, len(maindf), blocksize)):
+for i in tqdm(range(start, len(maindf), blocksize)):
     idx = maindf.iloc[i:i+blocksize][pub.uidcol]
     maindf.iloc[i:i+blocksize].apply(get_doc_nerchars, axis=1)
     nerdf[nerdf[pub.uidcol].isin(idx)].to_csv(f"../../data/{pub.name}/ner/ner_full{i}.csv")
 nerdf.to_csv(f"../../data/{pub.name}/ner/ner_full2.csv")
-dfls = []
-ndf = pd.concat(pd.read_csv(f"../../data/{pub.name}/ner/ner_full{i}.csv") for i in range(0, len(maindf), 500))
-path = f"../../data/{pub.name}/ner/ner_full2.csv"
-nerdf.to_csv(path)
-utils.df_to_s3(ndf, f"{pub.name}/ner/ner_full2.csv")
+utils.df_to_s3(nerdf, f"{pub.name}/ner/ner_full2.csv")
 
+# dfls = []
+# ndf = pd.concat(pd.read_csv(f"../../data/{pub.name}/ner/ner_full{i}.csv") for i in range(0, 400, blocksize))
+# path = f"../../data/{pub.name}/ner/ner_full2.csv"
+# nerdf.to_csv(path)
+# utils.df_to_s3(ndf, f"{pub.name}/ner/ner_full2.csv")
+#%%
 # algo: for every article...
 maindf.progress_apply(get_doc_nerchars, axis=1)
 nerdf.start_char = nerdf.start_char.astype(pd.Int64Dtype())
