@@ -216,24 +216,117 @@ df.loc[mask2, "long_speaker"].value_counts().head(10)
 
 # Analysis part 2 ###################
 #%% 
-cdailyq = utils.read_df_s3("chinadaily/quotes/quotes_full_edits.csv")
+cdailyq = utils.standardize(utils.read_df_s3("chinadaily/quotes/quotes_full_edits.csv"), pub, drop_dups=False)
+cdailyq = utils.standardize(cdailyq, pub, drop_dups=False)
 cdailyq.head()#.long_speaker.value_counts().head(20)
-cdailyner = utils.read_df_s3("chinadaily/ner/ner_full.csv")
-cdailyq.iloc[1].head()
+cdailyner = utils.standardize(utils.read_df_s3("chinadaily/ner/ner_full2.csv"), pub, drop_dups=False)
+cdailyner = utils.standardize(cdailyner, pub, drop_dups=False)
+# let's splinter the df into years and join later 
+# bc that seems to be faster? 
+
+year = 2021
+# quotedf = cdailyq
+# %%
+pub = utils.publications['nyt']
+quotedf = utils.standardize(utils.read_df_s3(f"{pub.name}/quotes/quotes_full_edits.csv"), pub, drop_dups=False)
+nerdf = utils.standardize(utils.read_df_s3(f"{pub.name}/ner/ner_full2.csv"), pub, drop_dups=False)
+
+datedf = utils.standardize(utils.read_df_s3(f"{pub.name}/date/date.csv"), pub, drop_dups=False)
+quotedf = quotedf.merge(datedf[["Art_id", "Year"]], on="Art_id")
+quotedf = quotedf.drop("Unnamed: 0.1", axis=1)
+quotedf = quotedf.drop_duplicates()
+nerdf = nerdf.merge(datedf[["Art_id", "Year"]], on="Art_id")
+nerdf = nerdf.drop_duplicates(subset=nerdf.columns.difference(['ner_index']))
+ppl = nerdf[nerdf.label_.eq("PERSON")]
+# %%
+def find_entity(qrow, ner):
+    # neridx = ner rows from article of quote in qrow
+    neridx = ner[ner.Art_id.eq(qrow.Art_id)]
+    # convert string tuple to py tuple
+    tup = eval(qrow.speaker_index)
+    overlaps = neridx[(neridx.start_char.ge(tup[0])) & (neridx.start_char.lt(tup[1]))]
+    return overlaps[['entity', "ner_index"]].values.tolist()
+# %%
+qdfls = []
+for year in range(2011, 2022):
+    # year = 2019
+    # make it a manageable size
+    qyr = quotedf[quotedf.Year.eq(year)]
+    nyr = ppl[ppl.Year.eq(year)]
+    # qyr = qyr.tail(10)
+    qyr['entities'] = qyr.progress_apply(find_entity, ner=nyr, axis=1)
+    x= qyr.entities.apply(pd.Series)
+    for col in x.columns:
+        for i, type_ in enumerate(("entity", "nerindex")):
+            qyr['{}_{}'.format(type_, str(col+1))]=[k[i] if isinstance(k,list) else k for k in x[col]]
+    # convert to ints
+    for col in qyr.filter(regex="nerindex").columns:
+        if qyr[col].dtype == "float64":
+            qyr[col] = qyr[col].astype(pd.Int64Dtype())#)
+    qdfls.append(qyr)
+
+qdfconcat = pd.concat(qdfls)
+# %%
+qdfconcat[qdfconcat.entity_6.notna()]
+# %%
+find_entity(quotedf.loc[3429], ner=ppl)
+qrow=quotedf.loc[3429]
+# %% 
+# qyr.nerindex_1.astype(pd.Int64Dtype())
+    pd.DataFrame([0].tolist())
+    # .apply([pd.Series(x) for x in df.teams])
+    .reset_index().apply(pd.Series.explode, axis=1)
+    pd.DataFrame(qyr['entities'])# .apply(pd.Series)[0].apply(pd.Series)
+qrow = qyr.iloc[-6]
+df = pd.DataFrame({'A': ['x1','x2','x3', 'x4'], 'B':[['v1','v2'],['v3','v4'],['v5','v6'],['v7','v8']], 'C':[['c1','c2'],['c3','c4'],['c5','c6'],['c7','c8']],'D':[['d1','d2'],['d3','d4'],['d5','d6'],['d7','d8']], 'E':[['e1','e2'],['e3','e4'],['e5','e6'],['e7','e8']]})
+df.apply(pd.Series.explode).reset_index()
+
+    # now we need a picture of how many overlap rows there are...
+    return len(overlaps)
+# %%
+quote = cdailyq.iloc[1]
+idx = quote.Art_id
+neridx = cdailyner[cdailyner.Art_id.eq(idx)]
+ppl = neridx[neridx.label_.eq("PERSON")]
+# convert string tuple into real tuple
+tup = eval(quote.speaker_index)
+quote.speaker
+ppl[(ppl.start_char.ge(tup[0])) & (ppl.start_char.lt(tup[1]))]
+
+# so this works... 
+# let's add a column to the quote dataframe with 
+# matched entities... maybe arbitrary number of matched entities? 
+#       ok so do I match only for long cols or also more or less exact matches? 
+#       I think it's fine for our NER to be our source of truth to weed out hard 
+#       to parse quotes? 
+# don't think it'll be more than 3-5 max
+# our best speaker will be the shortened entity
+# matched with a longer name potentially
+# and later coreference resolution????
+# %%
+
+
+
+pub = utils.publications['chinadaily']
+utils.standardize(cdailyq, pub, drop_dups=False)
+
 cdailyner.loc[lambda d: d.id.eq(14361751)]
 
 cdailymain = utils.get_df(utils.publications['chinadaily'])
 cdailymain.loc[lambda d: d.id.eq("14361751")].plainText.squeeze()[800:900]
+
+
 
 # Problem: quote ner is by character index
 # normal ner is by word index 
 # solution: get character index of the ners 
 # how long will this take? 
 # perhaps sagemaker can help on this one. 
-
+# %%
+# character index problem #####################
 import spacy
 import os
-nlp = spacy.load("en_core_web_lg")
+# nlp = spacy.load("en_core_web_lg")
 nlp = spacy.load("en_core_web_md")
 
 # %%
@@ -245,18 +338,21 @@ def get_doc_nerchars(row):
     try:
         doc = nlp(row[pub.textcol], disable=["tok2vec", "tagger", "parser", "attribute_ruler", "lemmatizer", "ner"])
     except ValueError as ve:
-        print(row[pub.uidcol])
-        print(ve)
+        # print(row[pub.uidcol])
+        # print(ve)
         return None
 
     mask = nerdf[pub.uidcol].eq(row[pub.uidcol])
     try:
+        # newner = nerdf[mask]
+        # newner["start_char"], newner["end_char"] = zip(*newner.apply(nerchar, doc=doc, axis=1))
+        # return newner
         nerdf.loc[mask, "start_char"], nerdf.loc[mask, "end_char"] = zip(*nerdf[mask].apply(nerchar, doc=doc, axis=1))
     except ValueError as ve:
-        print(row[pub.uidcol])
-        print(ve)
+        # print(row[pub.uidcol])
+        # print(ve)
         return None
-        
+   
     
 def nerchar(nrow, doc):
     """Gets the start/end_chars of tokens in ner."""
@@ -266,14 +362,76 @@ def nerchar(nrow, doc):
 # %% 
 # for every publication
 # for pub in utils.publication.values():
+# pub = utils.publications['chinadaily']
+# maindf = utils.get_df(pub)
+# nerdf = utils.read_df_s3(f"{pub.name}/ner/ner_full.csv")
+# quotedf = utils.read_df_s3(f"{pub.name}/quotes/quotes_full_edits.csv")
+# nerdf[pub.uidcol] = nerdf[pub.uidcol].astype(str)
+# maindf[pub.uidcol] = maindf[pub.uidcol].astype(str)
+# nerdf = nerdf.rename({"Unnamed: 0": "ner_index"}, axis=1)
+# path = f"../../data/{pub.name}/ner/ner_full2.csv"
+# os.makedirs(os.path.dirname(path), exist_ok=True) 
+# # run in blocks of 200
+# start =0
+# blocksize = 200
+# for i in tqdm(range(start, len(maindf), blocksize)):
+#     idx = maindf.iloc[i:i+blocksize][pub.uidcol]
+#     maindf.iloc[i:i+blocksize].apply(get_doc_nerchars, axis=1)
+#     nerdf[nerdf[pub.uidcol].isin(idx)].to_csv(f"../../data/{pub.name}/ner/ner_full{i}.csv")
+# nerdf.to_csv(f"../../data/{pub.name}/ner/ner_full2.csv")
+# utils.df_to_s3(nerdf, f"{pub.name}/ner/ner_full2.csv")
+ppl = nerdf[nerdf.label_.eq("PERSON")]
+ppl
+
+# %%
+# need to run
+year = 2020
+nerdf = utils.get_df(pub, f"ner/ner_{year}.csv")
+maindf = utils.get_df(pub, f"{year}.csv")
+nerdf[pub.uidcol] = nerdf[pub.uidcol].astype(str)
+maindf[pub.uidcol] = maindf[pub.uidcol].astype(str)
+nerdf = nerdf.rename({"Unnamed: 0": "ner_index"}, axis=1)
+maindf.progress_apply(get_doc_nerchars, axis=1)
+# newners = pd.concat(newners.tolist())
+path = f"../../data/{pub.name}/ner/ner_full_{year}.csv"
+os.makedirs(os.path.dirname(path), exist_ok=True) 
+nerdf.to_csv(path)
+utils.df_to_s3(nerdf, f"{pub.name}/ner/ner_full_{year}.csv")
+
+# %%
+def scmprun(year):
+    nerdf = utils.get_df(pub, f"ner/ner_{year}.csv")
+    maindf = utils.get_df(pub, f"{year}.csv")
+    nerdf[pub.uidcol] = nerdf[pub.uidcol].astype(str)
+    maindf[pub.uidcol] = maindf[pub.uidcol].astype(str)
+    nerdf = nerdf.rename({"Unnamed: 0": "ner_index"}, axis=1)
+    maindf.progress_apply(get_doc_nerchars, axis=1)
+    path = f"../../data/{pub.name}/ner/ner_full_{year}.csv"
+    os.makedirs(os.path.dirname(path), exist_ok=True) 
+    nerdf.to_csv(path)
+    utils.df_to_s3(nerdf, f"{pub.name}/ner/ner_full_{year}.csv")
+# %%
+scmprun(2020)
+# %%
+pub = utils.publications['scmp']
 maindf = utils.get_df(pub)
 nerdf = utils.read_df_s3(f"{pub.name}/ner/ner_full.csv")
 quotedf = utils.read_df_s3(f"{pub.name}/quotes/quotes_full_edits.csv")
 nerdf[pub.uidcol] = nerdf[pub.uidcol].astype(str)
 maindf[pub.uidcol] = maindf[pub.uidcol].astype(str)
 nerdf = nerdf.rename({"Unnamed: 0": "ner_index"}, axis=1)
+path = f"../../data/{pub.name}/ner/ner_full2020.csv"
+os.makedirs(os.path.dirname(path), exist_ok=True) 
+# %% 
+maindf.progress_apply(get_doc_nerchars, axis=1)
+nerdf.start_char = nerdf.start_char.astype(pd.Int64Dtype())
+nerdf.end_char = nerdf.end_char.astype(pd.Int64Dtype())
 path = f"../../data/{pub.name}/ner/ner_full2.csv"
 os.makedirs(os.path.dirname(path), exist_ok=True) 
+nerdf.to_csv(path)
+utils.df_to_s3(nerdf, f"{pub.name}/ner/ner_full2.csv")
+
+# %%
 # run in blocks of 200
 start =0
 blocksize = 200
@@ -283,7 +441,7 @@ for i in tqdm(range(start, len(maindf), blocksize)):
     nerdf[nerdf[pub.uidcol].isin(idx)].to_csv(f"../../data/{pub.name}/ner/ner_full{i}.csv")
 nerdf.to_csv(f"../../data/{pub.name}/ner/ner_full2.csv")
 utils.df_to_s3(nerdf, f"{pub.name}/ner/ner_full2.csv")
-
+# %%
 # dfls = []
 # ndf = pd.concat(pd.read_csv(f"../../data/{pub.name}/ner/ner_full{i}.csv") for i in range(0, 400, blocksize))
 # path = f"../../data/{pub.name}/ner/ner_full2.csv"
@@ -291,13 +449,7 @@ utils.df_to_s3(nerdf, f"{pub.name}/ner/ner_full2.csv")
 # utils.df_to_s3(ndf, f"{pub.name}/ner/ner_full2.csv")
 #%%
 # algo: for every article...
-maindf.progress_apply(get_doc_nerchars, axis=1)
-nerdf.start_char = nerdf.start_char.astype(pd.Int64Dtype())
-nerdf.end_char = nerdf.end_char.astype(pd.Int64Dtype())
-path = f"../../data/{pub.name}/ner/ner_full2.csv"
-os.makedirs(os.path.dirname(path), exist_ok=True) 
-nerdf.to_csv(path)
-utils.df_to_s3(nerdf, f"{pub.name}/ner/ner_full2.csv")
+
 
 # %%
 maindf.loc[lambda d: d[pub.uidcol].eq("13996059")]
