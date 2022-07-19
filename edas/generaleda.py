@@ -121,3 +121,20 @@ df.rename(lookup)
 df.rename(columns={"Index": "Art_id"})
 df.Index
 # %%
+# GLOBAL TIMES CD DUPLCIATION ANALYSIS ####################
+cd = utils.get_df(utils.publications['chinadaily'])
+gt = utils.get_df(utils.publications['globaltimes'])
+
+gtcd = pd.concat(
+    [utils.standardize(cd, utils.publications['chinadaily']),
+    utils.standardize(gt, utils.publications['globaltimes'])]
+    )
+
+# get duplicates 
+# keep first instance i.e. china daily instance. 
+dupmask = gtcd.assign(bodylow = lambda d: d.Body.str.lower().str.strip()).bodylow.duplicated()
+gtcd[dupmask].Body.str.contains("Alibaba").value_counts(dropna=False)
+# 386 dropped non-unique stories [184 had nan bodies so only 386 were real dups]
+# code to filter if you wanted to: 
+# note that we want non-duplicated values ~
+# gtcd[~dupmask]

@@ -70,7 +70,9 @@ class logconfig:
         }
 
 def log_clean():
-    """Deletes all but most recent file in each logging folder"""
+    """Deletes all but most recent file in each logging folder.
+    Not yet implemented.
+    """
     pass
 
 

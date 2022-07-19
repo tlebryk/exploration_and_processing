@@ -61,10 +61,15 @@ val_cnts.sort_index().plot()
 
 maindf = pd.concat([nyt, cd, scmp, globaltimes, hkfp] )
 maindf = maindf[maindf.Year.ge(2011)]
+utils.just_letters()
+maindf['headlow'] = maindf.Headline.str.lower().apply(utils.justletters)
+# drop duplicate headlines from same year. 
+maindf = maindf.drop_duplicates(subset=['headlow', 'Year'])
 maindf.head()
 maindf.Year.value_counts(dropna=False)
 maindf['cnt']  = 1
 maindfgrouped = maindf.groupby(["Publication", "Year"]).size().rename("Alibaba mentions")
+maindfgrouped
 # gotta clean up this code
 # %%
 # plotting yearly alibaba mentions by each publication

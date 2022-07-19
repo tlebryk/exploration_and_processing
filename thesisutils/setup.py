@@ -1,8 +1,8 @@
 import setuptools
 
 setuptools.setup(name='thesisutils',
-version='0.3.5',
-description='s3 logging',
+version='0.3.9',
+description='Convert date column to datetime object w/ inferdatetime',
 url='#',
 author='Theo',
 install_requires=[
