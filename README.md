@@ -39,3 +39,9 @@ By default things are run using the thesis virtual environment. Newssentiment re
     - `poc\polifilter_poc`: Placeholder for the `thesis/polinews` poc because we need to run from the [Political-News-Filter](https://github.com/lukasgebhard/Political-News-Filter) repo and can't install package. Gets probability article is about politics. 
     - `poc\quote_poc`: quote extraction inspired by [GenderGapTracker](https://github.com/sfu-discourse-lab/GenderGapTracker). 
 - `tmp_quote21.csv`: a random file from scmp `quote _analaysis.py` which has single word quote speakers consoldiated into longer ones when possible. 
+
+
+
+## Random data notes
+There is some disparate drop behavior. We drop at the level of the main df
+The safest way to construct a full dataframe is to read train and test individually. 
