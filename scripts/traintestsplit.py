@@ -58,6 +58,7 @@ def go():
     # chinadaily
     pub = utils.publications["chinadaily"]
     df = utils.get_df(pub)
+    # 1080 masked value counts. 
     maskst = df.storyType.astype(str).str.contains("VIDEO|AUDIO|HREF|INNERLINK")
     dupmask = df[pub.uidcol].duplicated()
     dupmask.value_counts()
