@@ -8,6 +8,7 @@ from sklearn.linear_model import SGDClassifier, LogisticRegression
 # %%
 pub = utils.publications['scmp']
 df = utils.main_date_load(pub)
+# filter opinion 
 # extradition bill introduction starts Mar 15 2019
 # set end as December 2019 (2020 covid shut down protests)
 protests = df[df.Date.ge("2019-03-15") & df.Date.lt("2020-01-01")]
@@ -16,12 +17,13 @@ protests['hk_protest_tag'] = protests.Topics.str.contains("Hong Kong protests")
 protests['extradition_tag'] = protests.Topics.str.contains("Hong Kong extradition bill")
 protests['Hong_Kong_police'] = protests.Topics.str.contains("Hong Kong police")
 protests['Hong_Kong_Basic_Law'] = protests.Topics.str.contains("Hong Kong Basic Law")
-
+protests[protests.Hong_Kong_Basic_Law].Headline.apply(print)
 
 protests[protests['Hong_Kong_police'] & (~protests['hk_protest_tag'] & ~protests['extradition_tag'])]
 protests[protests['hk_protest_tag'].ne(protests['extradition_tag'])]
 x=protests.Topics.str.split(",").explode().value_counts()
 
+protests.Url.str.contains("comment").value_counts()
 
 datedf = utils.standardize(utils.get_df(pub, "date/date.csv"), pub)
 df = df.merge(datedf, on="Art_id")

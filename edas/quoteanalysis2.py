@@ -48,9 +48,6 @@ def lookupsingleent(qrow):
     candidates = nerart[nerart['entlen'].ge(2) & nerart['entlen'].lt(5)]
     result = candidates[candidates.splitent.apply(lambda s: qrow.entity_1 in s)]
 
-    # result = candidates[candidates.splitent.apply(lambda s: "Wong" in s)]
-    
-    
     if len(result) == 1:
         return result.entity.squeeze()
     elif len(result) == 0:

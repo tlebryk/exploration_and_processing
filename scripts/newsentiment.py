@@ -234,6 +234,11 @@ print(maindf.head())
 # %%
 pub = utils.publications["scmp"]
 maindf = utils.timeit(run, pub, target, "test", bucket)
+maindf = utils.timeit(run, pub, target, "train", bucket)
+print(maindf.head())
+# %%
+pub = utils.publications["scmp"]
+maindf = utils.timeit(run, pub, target, "train", bucket)
 print(maindf.head())
 # %%
 pub = utils.publications["chinadaily"]
