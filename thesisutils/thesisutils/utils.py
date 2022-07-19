@@ -83,7 +83,7 @@ def report(a, b, preprint="", postprint=""):
     :param a: numerator
     :param b: remaining value added to a for demonenator
     :param preprint: str to print before fraction report
-    :param postpring: str to print acter fraction report 
+    :param postpring: str to print acter fraction report
     """
     perc = get_perc(a, b)
     if preprint:
@@ -106,6 +106,11 @@ def get_df(publication, *args):
         args = [f"{publication.name}_full.csv"]
     fullpath = os.path.join(ROOTPATH, publication.name, *args)
     df = pd.read_csv(fullpath)
+    # drop the drops for scmp
+    # if publication.name == "scmp" and drops:
+    #     drop_df = pd.read_csv(r"C:\Users\tlebr\OneDrive - pku.edu.cn\Thesis\data\scmp\tts_mask\drops_main1.csv")
+    #     mask = ~df.Index.isin(drop_df.Index)
+    #     df = drop_report(df, mask)
     return df
 
 
@@ -127,9 +132,9 @@ def timeit(fn, *args, **kwargs):
 def read_df_s3(object_key, bucket="newyorktime", pubdefault=None):
     """Reads a csv from s3 and loads into pandas;
     Means do not have to store large files locally anymore.
-    :param pubdefault: pass a publication and overrides object_key 
+    :param pubdefault: pass a publication and overrides object_key
         fn to just read the main df from that publication.
-        lazy and hacky but deal with it. 
+        lazy and hacky but deal with it.
     """
     if pubdefault:
         object_key = f"{pubdefault.name}/{pubdefault.name}_full.csv"
@@ -141,6 +146,31 @@ def read_df_s3(object_key, bucket="newyorktime", pubdefault=None):
     return df
 
 
+def cleanbody(df, pub: Publication, drop_dups=True):
+    """Some common cleaning for the maindf (i.e. one with a Body col).
+        returns a df with bodylower (body just lowercase) and bodyalphabet
+        (just alphabetical chars, no spaces, punctuation or numbers) cols.
+    :param df: standard df with common column names already looked up.
+    """
+    # generic cleaning
+    if "Body" in df.columns:
+        df.Body = df.Body.astype(str)
+        shortmask = df.Body.astype(str).str.len().lt(100)
+        df = drop_report(df, shortmask, "body < 100 chars")
+        # in tts_mask, maybe we need a pure duplication mask
+        # based on Art_id & Body
+        # or we could redo our tts entirely...
+        # and a sections mask for scmp and global times
+        if drop_dups:
+            dupmask = df["Body"].duplicated()
+            df = drop_report(df, dupmask, "Body duplicates")
+        df["bodylower"] = df.Body.str.tolower()
+        df["bodyalphabet"] = df["bodylower"].str.replace('[^a-zA-Z]', '')
+    else:
+        logger.warning("Didn't find body col - did you mean to call cleanbody?")
+    return df
+
+
 def standardize(df: pd.DataFrame, pub: Publication, drop_dups=True):
     """Standardizes column values for following columns:
         - Art_id
@@ -148,10 +178,9 @@ def standardize(df: pd.DataFrame, pub: Publication, drop_dups=True):
         - Headline
     not yet standardize topics
     """
-
+    logger.info("working on %s", pub.name)
     df = (
-        df.rename(columns=LOOKUP)
-        .assign(
+        df.rename(columns=LOOKUP).assign(
             Publication=pub.name,
         )
         # .drop("Unnamed: 0", axis=1, errors="ignore")
@@ -160,11 +189,12 @@ def standardize(df: pd.DataFrame, pub: Publication, drop_dups=True):
         df = df.drop_duplicates("Art_id")
     return df
 
-def drop_report(df, mask):
+
+def drop_report(df, mask, preprint=""):
     """Prints number of rows dropped by a mask and returns filtered df"""
-    preprint = "Dropping rows:"
+    preprint += "Dropping rows:"
     try:
-        report(mask.value_counts().loc[False], len(df), preprint)
+        report(mask.value_counts().loc[False], mask.value_counts().loc[True], preprint)
     except KeyError as ke:
         print("nothing to drop")
     return df[mask]
@@ -194,6 +224,7 @@ def main_date_load(pub, baba=False, *args):
     # avoid dup cols
     datedf = datedf.drop("Publication", axis=1, errors="ignore")
     df = df.merge(datedf, on="Art_id")
+    df.Date = pd.to_datetime(df.Date, infer_datetime_format=True)
     return df
 
     # get datedf
