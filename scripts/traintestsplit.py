@@ -62,8 +62,18 @@ def go():
     maskst = df.storyType.astype(str).str.contains("VIDEO|AUDIO|HREF|INNERLINK")
     dupmask = df[pub.uidcol].duplicated()
     dupmask.value_counts()
+    sectwords = "Op-Ed|Opinion|Comment|Editorial|Video|Life|Sports|Art|Advertorial|Food|Movies"
+    opmask = (
+        df.assign(
+            columnchannel = lambda x: x.channelName.str.cat(x.columnName.astype(str))
+    )
+    # .str.lower()
+    # .str.replace("-", ""))
+    .columnchannel.str.contains(sectwords)
+    )
+    opmask.value_counts()
     # 315 duplicates
-    drops = df[maskst | dupmask]
+    drops = df[maskst | dupmask | opmask]
     keeps = df[~maskst & ~dupmask]
     train, test = tts(pub, df=keeps, splitname="main1", **kwargs)
     drops[pub.uidcol].to_csv(
@@ -154,6 +164,16 @@ def babarun(tts):
     df = utils.read_df_s3(f"{pub.name}/{pub.name}_full.csv", bucket="aliba")
     maskst = df.storyType.astype(str).str.contains("VIDEO|AUDIO|HREF|INNERLINK")
     dupmask = df[pub.uidcol].duplicated()
+    sectwords = "Op-Ed|Opinion|Comment|Editorial|Video|Life|Sports|Art|Advertorial|Food|Movies"
+    opmask = (
+        df.assign(
+            columnchannel = lambda x: x.channelName.str.cat(x.columnName.astype(str))
+    )
+    # .str.lower()
+    # .str.replace("-", ""))
+    .columnchannel.str.contains(sectwords)
+    )
+    opmask.value_counts()
     dupmask.value_counts()
     maskst.value_counts()
     # 152 duplicates, 151 wrong story type
@@ -164,9 +184,9 @@ def babarun(tts):
         os.makedirs(path)
     train, test = tts(pub, df=keeps, splitname="main1", path=path, **kwargs)
     drops[pub.uidcol].to_csv(os.path.join(path, "drops_main1.csv"))
-    utils.df_to_s3(train, key=f"{pub.name}/tts_mask/n1.csv", bucket="aliba")
-    utils.df_to_s3(test, key=f"{pub.name}/tts_mask/1.csv", bucket="aliba")
-    utils.df_to_s3(drops[pub.uidcol], key=f"{pub.name}/tts_mask/n1.csv", bucket="aliba")
+    utils.df_to_s3(train, key=f"{pub.name}/tts_mask/train_main1.csv", bucket="aliba")
+    utils.df_to_s3(test, key=f"{pub.name}/tts_mask/test_main1.csv", bucket="aliba")
+    utils.df_to_s3(drops[pub.uidcol], key=f"{pub.name}/tts_mask/drops_main1.csv", bucket="aliba")
 
     # %%
     # nyt
