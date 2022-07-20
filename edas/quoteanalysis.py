@@ -99,10 +99,10 @@ def longspeakerpipeline(df, ner):
     return df
 # %%
 dfls = (
-    pd.read_csv(fr"C:\Users\tlebr\OneDrive - pku.edu.cn\Thesis\data\scmp\quotes\q{year}_edits.csv") for year in range(2011, 2022)
+    pd.read_csv(fr"{utils.ROOTPATH}\scmp\quotes\q{year}_edits.csv") for year in range(2011, 2022)
 )
-pd.concat(dfls).to_csv(r"C:\Users\tlebr\OneDrive - pku.edu.cn\Thesis\data\scmp\quotes\quotes_full_edits.csv")
-utils.upload_s3(r"C:\Users\tlebr\OneDrive - pku.edu.cn\Thesis\data\scmp\quotes\quotes_full_edits.csv",
+pd.concat(dfls).to_csv(rf"{utils.ROOTPATH}\scmp\quotes\quotes_full_edits.csv")
+utils.upload_s3(fr"{utils.ROOTPATH}\scmp\quotes\quotes_full_edits.csv",
     key="scmp\quotes\quotes_full_edits.csv",
 )
 
@@ -117,7 +117,7 @@ df2[[
     "source",
     "single_speaker",
     # "quote_index"
-    ]].to_csv(fr"C:\Users\tlebr\OneDrive - pku.edu.cn\Thesis\data\scmp\quotes\quotes_full_edits.csv")
+    ]].to_csv(fr"{utils.ROOTPATH}\scmp\quotes\quotes_full_edits.csv")
 
 # %%
 
@@ -181,7 +181,7 @@ df2[[
     "source",
     "single_speaker",
     # "quote_index"
-    ]].to_csv(f"C:\Users\tlebr\OneDrive - pku.edu.cn\Thesis\data\scmp\quotes\q{year}_edits.csv")
+    ]].to_csv(fr"{utils.ROOTPATH}\scmp\quotes\q{year}_edits.csv")
 
 
 

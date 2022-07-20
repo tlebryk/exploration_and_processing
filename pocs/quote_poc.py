@@ -21,7 +21,7 @@ def timeit(fn, *args, **kwargs):
 #%%
 # first col has quotes
 nlp = spacy.load("en_core_web_lg")
-df = pd.read_csv(r"C:\Users\tlebr\OneDrive - pku.edu.cn\Thesis\data\scmp\2021.csv")
+df = pd.read_csv(fr"{utils.ROOTPATH}\scmp\2021.csv")
 df.Body = df.Body.astype(str)
 
 # %%

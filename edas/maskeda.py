@@ -6,8 +6,9 @@ Explores the effect of subsetting the data on political articles
 import pandas as pd
 import os
 import re
+from thesisutils import utils
 
-ROOTPATH = r"C:\Users\tlebr\OneDrive - pku.edu.cn\Thesis\data"
+ROOTPATH = utils.ROOTPATH
 
 # %%
 # minieda 
@@ -80,7 +81,7 @@ for publication in publications:
 
 # %% hong kong filter
 publication = "scmp"
-df = pd.read_csv(r"C:\Users\tlebr\OneDrive - pku.edu.cn\Thesis\data\scmp\scmp_full.csv")
+df = pd.read_csv(rf"{utils.ROOTPATH}\scmp\scmp_full.csv")
 df['textconcat'] = df.Headline + df.Body
 
 
