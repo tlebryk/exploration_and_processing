@@ -1,8 +1,8 @@
 import setuptools
 
 setuptools.setup(name='thesisutils',
-version='0.3.9',
-description='Convert date column to datetime object w/ inferdatetime',
+version='0.3.10',
+description='standard cleaning with tts mask',
 url='#',
 author='Theo',
 install_requires=[

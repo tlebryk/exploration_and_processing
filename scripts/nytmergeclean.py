@@ -28,4 +28,4 @@ df.columns
     # .merge(kws, on="_id", how="left", suffixes=["", "_kws"])
     # .merge(authors, on="_id", how="left", suffixes=["", "_authors"])
     # .dropna(how="all", axis="columns")
-).to_csv(r"C:\Users\tlebr\OneDrive - pku.edu.cn\Thesis\data\nyt\nyt_full.csv")
+).to_csv(fr"{utils.ROOTPATH}\nyt\nyt_full.csv")

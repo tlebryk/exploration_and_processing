@@ -17,7 +17,7 @@ logging.config.dictConfig(lgconf.config_dct)
 logger = logging.getLogger(__name__)
 
 bucket = "newyorktime"
-rootpath = r"C:\Users\tlebr\OneDrive - pku.edu.cn\Thesis\data"
+rootpath = utils.ROOTPATH
 
 # DATE UPLOAD ##############################
 # for publication in utils.publications.values():

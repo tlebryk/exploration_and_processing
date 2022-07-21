@@ -3,7 +3,7 @@ import pandas as pd
 import os
 from thesisutils import utils
 
-dir = r"C:\Users\tlebr\OneDrive - pku.edu.cn\Thesis\data\baba\chinadaily"
+dir = rf"{utils.ROOTPATH}\baba\chinadaily"
 df = pd.concat(
     pd.read_json(os.path.join(dir, f), lines=True) for f in os.listdir(dir)
 )
@@ -48,7 +48,7 @@ drop_cols = [
     "highlightContent",
 ]
 dropped = df.drop(drop_cols, axis=1)
-dropped.to_csv(r"C:\Users\tlebr\OneDrive - pku.edu.cn\Thesis\data\baba\chinadaily\chinadaily_full.csv")
+dropped.to_csv(fr"{utils.ROOTPATH}\baba\chinadaily\chinadaily_full.csv")
 # %%
 import boto3
 def upload_s3(filepath, bucket, key=None):
@@ -60,7 +60,7 @@ def upload_s3(filepath, bucket, key=None):
     except ClientError as e:
         logging.exception(e)
 utils.upload_s3(
-   r"C:\Users\tlebr\OneDrive - pku.edu.cn\Thesis\data\baba\chinadaily\chinadaily_full.csv", 
+   rf"{utils.ROOTPATH}\baba\chinadaily\chinadaily_full.csv", 
     bucket="aliba",
     key="chinadaily/chinadaily_full.csv"
     )

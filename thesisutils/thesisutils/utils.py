@@ -94,6 +94,36 @@ def report(a, b, preprint="", postprint=""):
         print(postprint)
     return perc
 
+def tts_match(df, pub: Publication, baba=False):
+    """Gets the train 
+    :param df: a standardized dataframe.
+    """
+    try:
+        # gotta navigate baba here..
+        if baba: 
+            basepath = os.path.join(ROOTPATH, "baba", pub.name, "tts_mask")
+        else:
+            basepath = os.path.join(ROOTPATH, pub.name, "tts_mask")
+
+        train = standardize(pd.read_csv(os.path.join(basepath, "train_main1.csv")), pub)
+        test = standardize(pd.read_csv(os.path.join(basepath, "test_main1.csv")), pub)
+    except FileNotFoundError as fe:
+        logger.warning("couldn't find tts mask locally; reading from s3")
+        if baba:
+            bucket = "aliba"
+        else:
+            bucket = "newyorktime"
+        
+        train = standardize(read_df_s3(f"{pub.name}/tts_mask/train_main1.csv", bucket), pub)
+        test = standardize(read_df_s3(f"{pub.name}/tts_mask/test_main1.csv", bucket), pub)
+    mask = df.Art_id.isin(train.Art_id)
+    df.loc[mask, 'tts'] = "train"
+    mask = df.Art_id.isin(test.Art_id)
+    df.loc[mask, 'tts'] = "test"
+    df.tts.value_counts(dropna=False)
+    df.tts = df.tts.fillna("drops")
+    df.tts = df.tts.astype("category")
+    return df
 
 def get_df(publication, *args):
     """
@@ -106,6 +136,7 @@ def get_df(publication, *args):
         args = [f"{publication.name}_full.csv"]
     fullpath = os.path.join(ROOTPATH, publication.name, *args)
     df = pd.read_csv(fullpath)
+    # get training and test information
     # drop the drops for scmp
     # if publication.name == "scmp" and drops:
     #     drop_df = pd.read_csv(r"C:\Users\tlebr\OneDrive - pku.edu.cn\Thesis\data\scmp\tts_mask\drops_main1.csv")
@@ -155,16 +186,16 @@ def cleanbody(df, pub: Publication, drop_dups=True):
     # generic cleaning
     if "Body" in df.columns:
         df.Body = df.Body.astype(str)
-        shortmask = df.Body.astype(str).str.len().lt(100)
+        shortmask = df.Body.str.len().gt(100)
         df = drop_report(df, shortmask, "body < 100 chars")
         # in tts_mask, maybe we need a pure duplication mask
         # based on Art_id & Body
         # or we could redo our tts entirely...
         # and a sections mask for scmp and global times
         if drop_dups:
-            dupmask = df["Body"].duplicated()
+            dupmask = ~df["Body"].duplicated()
             df = drop_report(df, dupmask, "Body duplicates")
-        df["bodylower"] = df.Body.str.tolower()
+        df["bodylower"] = df.Body.str.lower()
         df["bodyalphabet"] = df["bodylower"].str.replace('[^a-zA-Z]', '')
     else:
         logger.warning("Didn't find body col - did you mean to call cleanbody?")
@@ -191,7 +222,9 @@ def standardize(df: pd.DataFrame, pub: Publication, drop_dups=True):
 
 
 def drop_report(df, mask, preprint=""):
-    """Prints number of rows dropped by a mask and returns filtered df"""
+    """Prints number of rows dropped by a mask and returns filtered df
+    Mask is True for keeps, False for drops
+    """
     preprint += "Dropping rows:"
     try:
         report(mask.value_counts().loc[False], mask.value_counts().loc[True], preprint)
@@ -225,6 +258,10 @@ def main_date_load(pub, baba=False, *args):
     datedf = datedf.drop("Publication", axis=1, errors="ignore")
     df = df.merge(datedf, on="Art_id")
     df.Date = pd.to_datetime(df.Date, infer_datetime_format=True)
+    # str preprocessing
+    df = cleanbody(df, pub)
+    # get tts mask
+    df = tts_match(df, pub, baba)
     return df
 
     # get datedf

@@ -1,3 +1,7 @@
+"""Splits the data into train_main1, test_main1, and drop_main1.csv. 
+Run on both the HK corpus (.1:.9 train:test) and the baba corpus (.5:.5). 
+Drops include duplicates and wrong section
+"""
 from thesisutils import utils
 import os
 from sklearn.model_selection import train_test_split
@@ -24,6 +28,12 @@ def tts(publication, df=None, splitname="", path=None, *args, **kwargs):
     return train, test
 
 
+def traintestdrops3(pub, bucket, train, test, drops=None):
+    """saves train, test, and potentially drops dataframes to s3."""
+    utils.df_to_s3(train, key=f"{pub.name}/tts_mask/train_main1.csv", bucket=bucket)
+    utils.df_to_s3(test, key=f"{pub.name}/tts_mask/test_main1.csv", bucket=bucket)
+    if drops:
+        utils.df_to_s3(drops[pub.uidcol], key=f"{pub.name}/tts_mask/drops_main1.csv", bucket=bucket)
 
 
 # %% cleaning for each publication
@@ -31,6 +41,9 @@ def tts(publication, df=None, splitname="", path=None, *args, **kwargs):
 # scmp
 def go():
     kwargs = dict(random_state=1, test_size=0.9)
+    bucket="newyorktime"
+    # %% 
+    # scmp
     pub = utils.publications["scmp"]
     df = utils.get_df(pub)
     dupmask = df[pub.uidcol].duplicated()
@@ -44,16 +57,18 @@ def go():
         .astype(str)
         .agg(", ".join, axis=1)
     )
-
+    # remove non-news sections
     masksec = strsects.str.contains(
         "comment|opinion|cooking|letters|food-drink|style|sport"
     )  # |books|movies|hk-magazine|yp,")
     drops = df[maskna | masksec]
     keeps = df[~maskna & ~masksec]
-    tts(pub, df=keeps, splitname="main1", **kwargs)
+    train, test = tts(pub, df=keeps, splitname="main1", **kwargs)
     drops[pub.uidcol].to_csv(
         os.path.join(utils.ROOTPATH, pub.name, "tts_mask", "drops_main1.csv")
     )
+    traintestdrops3(pub, bucket, train, test, drops)
+
     # %%
     # chinadaily
     pub = utils.publications["chinadaily"]
@@ -74,11 +89,13 @@ def go():
     opmask.value_counts()
     # 315 duplicates
     drops = df[maskst | dupmask | opmask]
-    keeps = df[~maskst & ~dupmask]
+    keeps = df[~maskst & ~dupmask & ~opmask]
+    keeps.channelName.str.contains("Comment").value_counts()
     train, test = tts(pub, df=keeps, splitname="main1", **kwargs)
     drops[pub.uidcol].to_csv(
         os.path.join(utils.ROOTPATH, pub.name, "tts_mask", "drops_main1.csv")
     )
+    traintestdrops3(pub, bucket, train, test, drops)
     # %%
     # nyt
     pub = utils.publications["nyt"]
@@ -88,27 +105,45 @@ def go():
     # 418 duplicates
     drops = df[dupmask]
     keeps = df[~dupmask]
-    tts(pub, df=keeps, splitname="main1", **kwargs)
+    train, test = tts(pub, df=keeps, splitname="main1", **kwargs)
     drops[pub.uidcol].to_csv(
         os.path.join(utils.ROOTPATH, pub.name, "tts_mask", "drops_main1.csv")
     )
+    traintestdrops3(pub, bucket, train, test, drops)
     # %%
     # hkfp
     pub = utils.publications["hkfp"]
     df = utils.get_df(pub)
     dupmask = df[pub.uidcol].duplicated()
     dupmask.value_counts()
-    # no duplicates :)
-    tts(pub, splitname="main1", **kwargs)
+    drops = df[dupmask]
+    keeps = df[~dupmask]
+    train, test = tts(pub, df=keeps, splitname="main1", **kwargs)
+    drops[pub.uidcol].to_csv(
+        os.path.join(utils.ROOTPATH, pub.name, "tts_mask", "drops_main1.csv")
+    )
+    traintestdrops3(pub, bucket, train, test)#, drops)
+
     # %%
     # globaltimes
     pub = utils.publications["globaltimes"]
-
     df = utils.get_df(pub)
     dupmask = df[pub.uidcol].duplicated()
     dupmask.value_counts()
     # no duplciates :)
-    tts(pub, splitname="main1", **kwargs)
+    drops = df[dupmask]
+    keeps = df[~dupmask]
+    train, test = tts(pub, df=keeps, splitname="main1", **kwargs)
+    # drops[pub.uidcol].to_csv(
+    #     os.path.join(utils.ROOTPATH, pub.name, "tts_mask", "drops_main1.csv")
+    # )
+    traintestdrops3(pub, bucket, train, test)#, drops)
+    train, test = tts(pub, splitname="main1", **kwargs)
+    traintestdrops3(pub, bucket, train, test)#, drops)
+
+    # utils.df_to_s3(train, key=f"{pub.name}/tts_mask/train_main1.csv", bucket="aliba")
+    # utils.df_to_s3(test, key=f"{pub.name}/tts_mask/test_main1.csv", bucket="aliba")
+    # utils.df_to_s3(drops[pub.uidcol], key=f"{pub.name}/tts_mask/drops_main1.csv", bucket="aliba")
 
 
 # go()
@@ -118,11 +153,11 @@ def go():
 # ALIBABA RUN ####################
 def babarun(tts):
     kwargs = {"random_state": 1, "test_size": 0.5}
-
+    bucket="aliba"
     # %%
     # SCMP
     pub = utils.publications["scmp"]
-    df = utils.read_df_s3(f"{pub.name}/{pub.name}_full.csv", bucket="aliba")
+    df = utils.read_df_s3(f"{pub.name}/{pub.name}_full.csv", bucket=bucket)
     dupmask = df[pub.uidcol].duplicated()
     dupmask.value_counts()
     # result: no duplicates
@@ -154,14 +189,11 @@ def babarun(tts):
         os.makedirs(path)
     train, test = tts(pub, df=keeps, splitname="main1", path=path, **kwargs)
     drops[pub.uidcol].to_csv(os.path.join(path, "drops_main1.csv"))
-    utils.df_to_s3(train, key=f"{pub.name}/tts_mask/n1.csv", bucket="aliba")
-    utils.df_to_s3(test, key=f"{pub.name}/tts_mask/1.csv", bucket="aliba")
-    utils.df_to_s3(drops[pub.uidcol], key=f"{pub.name}/tts_mask/n1.csv", bucket="aliba")
-
+    traintestdrops3(pub, bucket, train, test, drops)
     # %%
     # chinadaily
     pub = utils.publications["chinadaily"]
-    df = utils.read_df_s3(f"{pub.name}/{pub.name}_full.csv", bucket="aliba")
+    df = utils.read_df_s3(f"{pub.name}/{pub.name}_full.csv", bucket=bucket)
     maskst = df.storyType.astype(str).str.contains("VIDEO|AUDIO|HREF|INNERLINK")
     dupmask = df[pub.uidcol].duplicated()
     sectwords = "Op-Ed|Opinion|Comment|Editorial|Video|Life|Sports|Art|Advertorial|Food|Movies"
@@ -177,21 +209,20 @@ def babarun(tts):
     dupmask.value_counts()
     maskst.value_counts()
     # 152 duplicates, 151 wrong story type
-    drops = df[maskst | dupmask]
-    keeps = df[~maskst & ~dupmask]
+    drops = df[maskst | dupmask | opmask]
+    keeps = df[~maskst & ~dupmask & ~opmask]
     path = os.path.join(utils.ROOTPATH, "baba", pub.name, "tts_mask")
     if not os.path.exists(path):
         os.makedirs(path)
     train, test = tts(pub, df=keeps, splitname="main1", path=path, **kwargs)
     drops[pub.uidcol].to_csv(os.path.join(path, "drops_main1.csv"))
-    utils.df_to_s3(train, key=f"{pub.name}/tts_mask/train_main1.csv", bucket="aliba")
-    utils.df_to_s3(test, key=f"{pub.name}/tts_mask/test_main1.csv", bucket="aliba")
-    utils.df_to_s3(drops[pub.uidcol], key=f"{pub.name}/tts_mask/drops_main1.csv", bucket="aliba")
+    traintestdrops3(pub, bucket, train, test, drops)
+
 
     # %%
     # nyt
     pub = utils.publications["nyt"]
-    df = utils.read_df_s3(f"{pub.name}/{pub.name}_full.csv", bucket="aliba")
+    df = utils.read_df_s3(f"{pub.name}/{pub.name}_full.csv", bucket=bucket)
     dupmask = df[pub.uidcol].duplicated()
     dupmask.value_counts()
     # 6 duplicates
@@ -202,14 +233,12 @@ def babarun(tts):
         os.makedirs(path)
     train, test = tts(pub, df=keeps, splitname="main1", path=path, **kwargs)
     drops[pub.uidcol].to_csv(os.path.join(path, "drops_main1.csv"))
-    utils.df_to_s3(train, key=f"{pub.name}/tts_mask/n1.csv", bucket="aliba")
-    utils.df_to_s3(test, key=f"{pub.name}/tts_mask/1.csv", bucket="aliba")
-    utils.df_to_s3(drops[pub.uidcol], key=f"{pub.name}/tts_mask/n1.csv", bucket="aliba")
+    traintestdrops3(pub, bucket, train, test, drops)
 
     # %%
     # hkfp
     pub = utils.publications["hkfp"]
-    df = utils.read_df_s3(f"{pub.name}/{pub.name}_full.csv", bucket="aliba")
+    df = utils.read_df_s3(f"{pub.name}/{pub.name}_full.csv", bucket=bucket)
     dupmask = df[pub.uidcol].duplicated()
     dupmask.value_counts()
     drops = df[dupmask]
@@ -221,15 +250,13 @@ def babarun(tts):
         os.makedirs(path)
     keeps = df
     train, test = tts(pub, df=keeps, splitname="main1", path=path, **kwargs)
-    utils.df_to_s3(train, key=f"{pub.name}/tts_mask/n1.csv", bucket="aliba")
-    utils.df_to_s3(test, key=f"{pub.name}/tts_mask/1.csv", bucket="aliba")
-    utils.df_to_s3(drops[pub.uidcol], key=f"{pub.name}/tts_mask/n1.csv", bucket="aliba")
+    traintestdrops3(pub, bucket, train, test, drops)
 
     # %%
     # globaltimes
     pub = utils.publications["globaltimes"]
 
-    df = utils.read_df_s3(f"{pub.name}/{pub.name}_full.csv", bucket="aliba")
+    df = utils.read_df_s3(f"{pub.name}/{pub.name}_full.csv", bucket=bucket)
     dupmask = df[pub.uidcol].duplicated()
     dupmask.value_counts()
     drops = df[dupmask]
@@ -243,9 +270,7 @@ def babarun(tts):
     keeps = df
     train, test = tts(pub, df=keeps, splitname="main1", path=path, **kwargs)
     drops[pub.uidcol].to_csv(os.path.join(path, "drops_main1.csv"))
-    utils.df_to_s3(train, key=f"{pub.name}/tts_mask/train_main1.csv", bucket="aliba")
-    utils.df_to_s3(test, key=f"{pub.name}/tts_mask/test_main1.csv", bucket="aliba")
-    utils.df_to_s3(drops[pub.uidcol], key=f"{pub.name}/tts_mask/drops_main1.csv", bucket="aliba")
+    traintestdrops3(pub, bucket, train, test, drops)
 
 
 babarun(tts)

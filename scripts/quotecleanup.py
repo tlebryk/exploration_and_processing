@@ -13,6 +13,16 @@ import pandas as pd
 from tqdm import tqdm
 tqdm.pandas()
 # %%
+# convert scmp q_year_edits.csv into quotes_full_edits.csv
+dfls = (
+    pd.read_csv(fr"{utils.ROOTPATH}\scmp\quotes\q{year}_edits.csv") for year in range(2011, 2022)
+)
+pd.concat(dfls).to_csv(rf"{utils.ROOTPATH}\scmp\quotes\quotes_full_edits.csv")
+utils.upload_s3(fr"{utils.ROOTPATH}\scmp\quotes\quotes_full_edits.csv",
+    key="scmp\quotes\quotes_full_edits.csv",
+)
+
+# %%
 
 # quote tts split 
 def nerquotetts(pub, quote=True):

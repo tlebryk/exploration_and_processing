@@ -324,7 +324,7 @@ print(maindf.head())
 # doc._.coref_resolved
 
 # #%%
-# df = pd.read_csv(r"C:\Users\tlebr\OneDrive - pku.edu.cn\Thesis\data\scmp\2021.csv")
+# df = pd.read_csv(rf"{utils.ROOTPATH}\scmp\2021.csv")
 # row = df.iloc[3]
 # r
 # doc = nlp(row.Body)
