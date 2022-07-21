@@ -1,3 +1,6 @@
+"""
+
+"""
 # %%
 from thesisutils import utils
 import pandas as pd
@@ -43,6 +46,11 @@ valcnts = quotedf['singleentityspeaker'].value_counts()
 utils.report(valcnts[True], quotedf.entity_1.isna().value_counts()[True]-valcnts[True], preprint="entity 1 with single word")
 # %%
 def lookupsingleent(qrow):
+    """When a matched entity within a speaker block is 1 word,
+        we lookup multiword entities with that word.
+        If we have multiple candidates, we select the closest result 
+        Currently slow but not prohibitively...
+    """
     nerart = ppl[ppl.Art_id.eq(qrow.Art_id)]
     # nerart = nerart[nerart.label_.eq("PERSON")]
     candidates = nerart[nerart['entlen'].ge(2) & nerart['entlen'].lt(5)]
@@ -98,5 +106,19 @@ def lookupent(qrow, entstr="xijinping"):
     valcnts = ents.entity.str.lower().str.replace('[^a-z]', '').str.contains("xijinping").value_counts()
     return True in valcnts.index
 # %%
-  
+
+# xidf[xidf['jinpingthere']] is anytime we find xi jinping as an entity 
+# in that articles ner
+xidf = quotedf[quotedf.entity_1.eq("Xi")]
+xidf['jinpingthere'] = xidf.apply(lookupent, entstr="jinping", axis=1)
+# 35/56 times xijinping is in ner
+xidf['jinpingthere'].value_counts()
+# 5/21 times when xijinping not found in ner it is found in the body of the article
+# merge on og to get a ref to Body
+  xidf = xidf.merge(df, how="inner", on = "Art_id")
+xidf['inbody'] = xidf.Body.str.lower().str.replace('[^a-zA-Z]', '').str.contains("xijinping")
+xidf['inbody'].value_counts() 
+xidf[~xidf.jinpingthere & ~xidf.inbody].Body.apply(print)
+
+
 # %%
