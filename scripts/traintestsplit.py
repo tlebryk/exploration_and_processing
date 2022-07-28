@@ -32,8 +32,9 @@ def traintestdrops3(pub, bucket, train, test, drops=None):
     """saves train, test, and potentially drops dataframes to s3."""
     utils.df_to_s3(train, key=f"{pub.name}/tts_mask/train_main1.csv", bucket=bucket)
     utils.df_to_s3(test, key=f"{pub.name}/tts_mask/test_main1.csv", bucket=bucket)
-    if drops:
-        utils.df_to_s3(drops[pub.uidcol], key=f"{pub.name}/tts_mask/drops_main1.csv", bucket=bucket)
+    if drops is None:
+        return None
+    utils.df_to_s3(drops[pub.uidcol], key=f"{pub.name}/tts_mask/drops_main1.csv", bucket=bucket)
 
 
 # %% cleaning for each publication
@@ -116,13 +117,16 @@ def go():
     df = utils.get_df(pub)
     dupmask = df[pub.uidcol].duplicated()
     dupmask.value_counts()
-    drops = df[dupmask]
-    keeps = df[~dupmask]
+    df.Section.str.split(",").explode().value_counts(dropna=False)
+    sectwords = "Opinion|Sport|Animals|Lifestyle|Arts|Video|Humour|Editorials|Travel"
+    masksec = df.Section.astype(str).str.contains(sectwords)
+    drops = df[dupmask | masksec]
+    keeps = df[~dupmask & ~masksec]
     train, test = tts(pub, df=keeps, splitname="main1", **kwargs)
     drops[pub.uidcol].to_csv(
         os.path.join(utils.ROOTPATH, pub.name, "tts_mask", "drops_main1.csv")
     )
-    traintestdrops3(pub, bucket, train, test)#, drops)
+    traintestdrops3(pub, bucket, train, test, drops)
 
     # %%
     # globaltimes
@@ -241,14 +245,18 @@ def babarun(tts):
     df = utils.read_df_s3(f"{pub.name}/{pub.name}_full.csv", bucket=bucket)
     dupmask = df[pub.uidcol].duplicated()
     dupmask.value_counts()
-    drops = df[dupmask]
+    sectwords = "Opinion|Sport|Animals|Lifestyle|Arts|Video|Humour|Editorials|Travel"
+    masksec = df.Section.astype(str).str.contains(sectwords)
+    masksec.value_counts(dropna=False)
+    drops = df[dupmask | masksec]
+    keeps = df[~dupmask & ~masksec]
     # EMPTY no duplicates :)
-    drops[pub.uidcol].to_csv(os.path.join(path, "drops_main1.csv"))
-
     path = os.path.join(utils.ROOTPATH, "baba", pub.name, "tts_mask")
     if not os.path.exists(path):
         os.makedirs(path)
-    keeps = df
+    drops[pub.uidcol].to_csv(os.path.join(path, "drops_main1.csv"))
+
+    # keeps = df
     train, test = tts(pub, df=keeps, splitname="main1", path=path, **kwargs)
     traintestdrops3(pub, bucket, train, test, drops)
 
