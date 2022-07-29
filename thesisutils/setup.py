@@ -1,8 +1,8 @@
 import setuptools
 
 setuptools.setup(name='thesisutils',
-version='0.3.10',
-description='standard cleaning with tts mask',
+version='0.3.11',
+description='maindate load reads from s3',
 url='#',
 author='Theo',
 install_requires=[

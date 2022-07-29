@@ -1,5 +1,7 @@
 """
 If you're working on different machines, overwrite the ROOTPATH to whatever path you have on your machine.
+.\nSupport HKFP | Code of Ethics | Error/typo? | Contact Us | Newsletter | Transparency & Annual Report'}
+
 """
 import re
 
@@ -156,7 +158,10 @@ def timeit(fn, *args, **kwargs):
     s = time.perf_counter()
     ret = fn(*args, **kwargs)
     e = time.perf_counter()
-    print(f"{fn.__name__} took {e-s} secs")
+    try:
+        print(f"{fn.__name__} took {e-s} secs")
+    except AttributeError as ae:
+         print(f"{fn} took {e-s} secs")
     return ret
 
 
@@ -243,20 +248,24 @@ def main_date_load(pub, baba=False, *args):
         meaning args should be "baba", f"{pub.name}_full.csv.
         remember get_df defaults to just pub.name_full.csv pub data dir.
     """
-    df = standardize(get_df(pub, *args), pub)
+    if baba: # and pub.name in ("nyt", "chinadaily", "globaltimes")
+        bucket = "aliba"
+    else:
+        bucket = "newyorktime"
+    datedf = read_df_s3(f"{pub.name}/date/date.csv", bucket)
+    datedf = standardize(datedf, pub)
+    df = read_df_s3(None, bucket, pubdefault=pub)
+    df = standardize(df, pub)
+    # df = standardize(get_df(pub, *args), pub)
     df = df.drop("Date", axis=1, errors="ignore")
     df["Textcol"] = df.Headline + "; " + df.Body
     mask = df.Textcol.notna()
     print("keeping non-na text cols:")
     print(mask.value_counts())
     df = df[mask]
-    if baba and pub.name in ("nyt", "chinadaily", "globaltimes"):
-        datedf = standardize(get_df(pub, "baba", "date", "date.csv"), pub)
-    else:
-        datedf = standardize(get_df(pub, "date", "date.csv"), pub)
     # avoid dup cols
     datedf = datedf.drop("Publication", axis=1, errors="ignore")
-    df = df.merge(datedf, on="Art_id")
+    df = df.merge(datedf, on="Art_id", how="left")
     df.Date = pd.to_datetime(df.Date, infer_datetime_format=True)
     # str preprocessing
     df = cleanbody(df, pub)
