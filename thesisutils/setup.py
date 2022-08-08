@@ -1,8 +1,8 @@
 import setuptools
 
 setuptools.setup(name='thesisutils',
-version='0.3.11',
-description='maindate load reads from s3',
+version='0.3.12',
+description='maindate adds poli and hkmask',
 url='#',
 author='Theo',
 install_requires=[

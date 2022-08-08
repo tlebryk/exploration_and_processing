@@ -263,13 +263,18 @@ def main_date_load(pub, baba=False, *args):
     print("keeping non-na text cols:")
     print(mask.value_counts())
     df = df[mask]
+    # get other masks 
+    hkmask = utils.standardize(utils.get_df(pub, "hk_mask", "hkmask.csv") , pub)
+    polimask = utils.standardize(utils.read_df_s3(f"{pub.name}/polimask/pmask_.csv", ))
+    df = df.merge(polimask, on="Art_id", how="left")
+    df = df.merge(hkmask, on="Art_id", how="left")
     # avoid dup cols
     datedf = datedf.drop("Publication", axis=1, errors="ignore")
     df = df.merge(datedf, on="Art_id", how="left")
     df.Date = pd.to_datetime(df.Date, infer_datetime_format=True)
     # str preprocessing
     df = cleanbody(df, pub)
-    # get tts mask
+    # get tts mask, adds to tts col
     df = tts_match(df, pub, baba)
     return df
 
