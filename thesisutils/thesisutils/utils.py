@@ -264,10 +264,10 @@ def main_date_load(pub, baba=False, *args):
     print(mask.value_counts())
     df = df[mask]
     # get other masks 
-    hkmask = utils.standardize(utils.get_df(pub, "hk_mask", "hkmask.csv") , pub)
-    polimask = utils.standardize(utils.read_df_s3(f"{pub.name}/polimask/pmask_.csv", ))
+    hkmask = standardize(read_df_s3(f"{pub.name}/hk_mask/hkmask.csv") , pub)
+    polimask = standardize(read_df_s3(f"{pub.name}/polimask/pmask_.csv"), pub)
     df = df.merge(polimask, on="Art_id", how="left")
-    df = df.merge(hkmask, on="Art_id", how="left")
+    df['hkmask'] = df.Art_id.isin(hkmask.Art_id)
     # avoid dup cols
     datedf = datedf.drop("Publication", axis=1, errors="ignore")
     df = df.merge(datedf, on="Art_id", how="left")

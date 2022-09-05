@@ -74,7 +74,7 @@ nerquotetts(pub, False)
 # SCMP is special 
 # run yearly consolidation first
 pub = utils.publications['scmp']
-df = pd.concat(utils.standardize(utils.read_df_s3(f"scmp/quotes/q_{yr}_full_edits_new716.csv"), pub) for yr in range(2011, 2022))
+df = pd.concat(utils.standardize(utils.read_df_s3(f"scmp/quotes/q_{yr}_full_edits_new716.csv"), pub, drop_dups=False,) for yr in range(2011, 2022))
 df.index = df.index.set_names(["quid"])
 df = df.reset_index()
 df = df.drop(['entities', "year", "publication"], axis=1)

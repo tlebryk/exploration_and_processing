@@ -144,7 +144,7 @@ def ner_run_baba(pub, local=True, outputkey=None):
     nerdf = utils.timeit(run, df, output_name, **kwargs)
     utils.df_to_s3(nerdf, outputkey)
 # %%
-pub = utils.publications['nyt']
+pub = utils.publications['globaltimes']
 ner_run_baba(pub, False)
 
 

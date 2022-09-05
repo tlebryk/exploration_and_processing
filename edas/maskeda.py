@@ -99,3 +99,61 @@ report(len(df[mask]), len(df[~mask]))
 df.loc[mask.notna() & mask.eq(False)].Topics.explode().value_counts().head(10)
 # hong kong filter seems effective - topics are irrelevant to hk or magazine anyway. 
 
+# %%
+# political filter mask: 
+# let's see when we do the 0.75 level. 
+from thesisutils import utils
+# %%
+def loaddata(pub):
+    df = utils.main_date_load(pub) 
+    pmask = utils.get_df(pub, "polimask/pmask_.csv")
+    pmask = utils.standardize(pmask, pub)
+    #df =
+    df=df.merge(pmask, how="left", on="Art_id")
+    return df
+
+# %%
+pub = utils.publications['chinadaily']
+chinadaily = loaddata(pub)
+# %%
+pub = utils.publications['nyt']
+nyt = loaddata(pub)
+# %%
+pub = utils.publications['hkfp']
+hkfp = loaddata(pub)
+# %%
+pub = utils.publications['scmp']
+scmp = loaddata(pub)
+# %%
+pub = utils.publications['globaltimes']
+globaltimes = loaddata(pub)
+# %%
+def get_intermediary_heads(df):
+    utils.drop_report(df, df.poliestimation.ge(.5) & df.poliestimation.le(0.75))
+    df[df.poliestimation.ge(.5) & df.poliestimation.le(0.75)].Headline.apply(print)
+# %%
+dfls = [chinadaily, nyt, hkfp, scmp, globaltimes]
+# %%
+get_intermediary_heads(scmp)
+# %%
+get_intermediary_heads(hkfp)
+# %%
+get_intermediary_heads(chinadaily)
+# %%
+get_intermediary_heads(hkfp)
+# %%
+get_intermediary_heads(nyt)
+# %%
+get_intermediary_heads(globaltimes)
+
+# %%
+def gettrainingsize(df):
+    # print(df.rename(columns={"Publication": "Publication_x"}).Publication.iloc[0])
+    print(len(df[df.poliestimation.ge(0.75)])*.1)
+[gettrainingsize(d) for d in dfls]
+
+
+# NOTE: need to drop more from China daily
+x=df[df.Headline.str.contains("China Daily editorial")]
+# NOTE: need to drop more from Global Times editorial
+x

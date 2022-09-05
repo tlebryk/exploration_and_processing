@@ -1,7 +1,8 @@
 """
 Makes a standardized "Date" column for each 
 publication and saves under "{pub}/date/date.csv"
-Run on 6/19/2021
+Run on 6/19/2021;
+Run on 8/2/2022 again for global times for baba and hk stories
 """
 from thesisutils import utils
 import pandas as pd
@@ -14,7 +15,7 @@ lgconf = logconfig.logconfig(Path(__file__).stem)
 logging.config.dictConfig(lgconf.config_dct)
 logger = logging.getLogger(__name__)
 # publication.name
-publication = utils.publications["scmp"]
+publication = utils.publications["globaltimes"]
 
 # %%
 def run(baba=False):
@@ -79,6 +80,8 @@ def run(baba=False):
         df = df[df.Date.notna()]
         df["Year"] = df.Date.dt.year
         df = df[df.Year < 2022]
+        df = df[df.Year > 2010]
+
         df["Month"] = df.Date.dt.month
         df["Day"] = df.Date.dt.day
         df["Hour"] = df.Date.dt.hour

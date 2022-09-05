@@ -5,7 +5,7 @@ Drops include duplicates and wrong section
 from thesisutils import utils
 import os
 from sklearn.model_selection import train_test_split
-
+import pandas as pd
 
 # %%
 # TRAINTESTSPLITtrain_test_split
@@ -60,10 +60,10 @@ def go():
     )
     # remove non-news sections
     masksec = strsects.str.contains(
-        "comment|opinion|cooking|letters|food-drink|style|sport"
-    )  # |books|movies|hk-magazine|yp,")
-    drops = df[maskna | masksec]
-    keeps = df[~maskna & ~masksec]
+        "comment|opinion|cooking|letters|food-drink|style|sport|books|movies|hk-magazine|yp"
+    ) 
+    drops = utils.drop_report(df, maskna | masksec)
+    keeps = utils.drop_report(df, ~maskna & ~masksec)
     train, test = tts(pub, df=keeps, splitname="main1", **kwargs)
     drops[pub.uidcol].to_csv(
         os.path.join(utils.ROOTPATH, pub.name, "tts_mask", "drops_main1.csv")
@@ -131,19 +131,24 @@ def go():
     # %%
     # globaltimes
     pub = utils.publications["globaltimes"]
-    df = utils.get_df(pub)
+    df = utils.read_df_s3(None, pubdefault=pub)
+    df.Section = df.Section.astype(str)
     dupmask = df[pub.uidcol].duplicated()
     dupmask.value_counts()
+    sectwords = "OPINION|SPORT|Comment|Viewpoint|ARTS|Film|LIFE|Soccer|Art|Books|Golf|Culture & Leisure|Food|TV|VIDEO|Tennis|Fashion|Basketball|Letters|Dance|GT Voice|Opinion"
+    masksec = df.Section.str.contains(sectwords)
+    yrmask = df.assign(
+        year = pd.to_datetime(df.Date).dt.year,
+        yrmask = lambda d: d.year.lt(2011) | d.year.gt(2021), axis=1
+    ).yrmask
+    drops = df[dupmask | masksec | yrmask]
+    keeps = df[~dupmask & ~masksec & ~yrmask]
     # no duplciates :)
-    drops = df[dupmask]
-    keeps = df[~dupmask]
     train, test = tts(pub, df=keeps, splitname="main1", **kwargs)
     # drops[pub.uidcol].to_csv(
     #     os.path.join(utils.ROOTPATH, pub.name, "tts_mask", "drops_main1.csv")
     # )
-    traintestdrops3(pub, bucket, train, test)#, drops)
-    train, test = tts(pub, splitname="main1", **kwargs)
-    traintestdrops3(pub, bucket, train, test)#, drops)
+    traintestdrops3(pub, bucket, train, test, drops)
 
     # utils.df_to_s3(train, key=f"{pub.name}/tts_mask/train_main1.csv", bucket="aliba")
     # utils.df_to_s3(test, key=f"{pub.name}/tts_mask/test_main1.csv", bucket="aliba")
@@ -265,20 +270,27 @@ def babarun(tts):
     pub = utils.publications["globaltimes"]
 
     df = utils.read_df_s3(f"{pub.name}/{pub.name}_full.csv", bucket=bucket)
+    df.Section = df.Section.astype(str)
     dupmask = df[pub.uidcol].duplicated()
     dupmask.value_counts()
-    drops = df[dupmask]
-    # EMPTY no duplicates :)
-    drops[pub.uidcol].to_csv(os.path.join(path, "drops_main1.csv"))
-
-    # no duplciates :)
+    sectwords = "OPINION|SPORT|Comments|Viewpoint|ARTS|Film|LIFE|Soccer|Art|Books|Golf|Culture & Leisure|Food|TV|VIDEO|Tennis|Fashion|Basketball|Letters|Dance|GT Voice|Opinion"
+    masksec = df.Section.str.contains(sectwords)
+    yrmask = df.assign(
+        year = pd.to_datetime(df.Date).dt.year,
+        yrmask = lambda d: d.year.lt(2011) | d.year.gt(2021), axis=1
+    ).yrmask
+    drops = df[dupmask | masksec | yrmask]
+    keeps = df[~dupmask & ~masksec & ~yrmask]
+     # no duplciates :)
     path = os.path.join(utils.ROOTPATH, "baba", pub.name, "tts_mask")
     if not os.path.exists(path):
         os.makedirs(path)
-    keeps = df
+    # no duplciates :)
     train, test = tts(pub, df=keeps, splitname="main1", path=path, **kwargs)
-    drops[pub.uidcol].to_csv(os.path.join(path, "drops_main1.csv"))
+    # drops[pub.uidcol].to_csv(
+    #     os.path.join(utils.ROOTPATH, pub.name, "tts_mask", "drops_main1.csv")
+    # )
     traintestdrops3(pub, bucket, train, test, drops)
-
+    drops[pub.uidcol].to_csv(os.path.join(path, "drops_main1.csv"))
 
 babarun(tts)

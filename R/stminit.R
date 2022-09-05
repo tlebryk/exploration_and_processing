@@ -34,11 +34,15 @@ polistops <-
   readLines(r"{C:\Users\tlebr\OneDrive - pku.edu.cn\Thesis\code\R\polistops.txt}")
 fullstop <- c(mystops, polistops)
 
+sentencestops <- 
+  readLines(r"{C:\Users\tlebr\OneDrive - pku.edu.cn\Thesis\code\R\sentences2remove.txt}")
+
 # alibaba ownership categorical
 
 # data <-
 #   aws.s3::s3read_using(read.csv, object = glue("s3://newyorktime/{publication}/tts_mask/train_main1.csv"))
 
+sentencestop2 <- paste(gsub('[[x:punct:] ]+|\n',' ', sentencestops), collapse ="|")
 
 loaddata <- function(publication, filename = "train_main1.csv") {
   lookup <-
@@ -53,34 +57,34 @@ loaddata <- function(publication, filename = "train_main1.csv") {
       Headline = "title" # nyt and gt?
     )
   ttsmask <-
-    # aws.s3::s3read_using(read.csv,
-    #                      object = glue(
-    #                        "s3://newyorktime/{publication}/tts_mask/train_main1.csv"
-                         # )) %>%
-    read.csv(file.path(rootpath, publication, "tts_mask", filename)) %>%
+    aws.s3::s3read_using(read.csv,
+                         object = glue(
+                           "s3://newyorktime/{publication}/tts_mask/{filename}"
+    )) %>%
+    # read.csv(file.path(rootpath, publication, "tts_mask", filename)) %>%
     rename(any_of(lookup))
   
   polimask <-
-    # aws.s3::s3read_using(read.csv,
-    #                      object = glue("s3://newyorktime/{publication}/polimask/pmask_.csv")) %>%
+    aws.s3::s3read_using(read.csv,
+                         object = glue("s3://newyorktime/{publication}/polimask/pmask_.csv")) %>%
     
-    read.csv(file.path(rootpath, publication, "polimask", "pmask_.csv")) %>%
+    # read.csv(file.path(rootpath, publication, "polimask", "pmask_.csv")) %>%
     rename(any_of(lookup)) %>%
-    filter(poliestimation >= 0.5) %>%
+    filter(poliestimation >= 0.75) %>%
     distinct(doc_id)
   
   
   hkmask <-
-    # aws.s3::s3read_using(read.csv,
-    #                      object = glue("s3://newyorktime/{publication}/hk_mask/hkmask.csv")) %>%
-    read.csv(file.path(rootpath, publication, "hk_mask", "hkmask.csv")) %>%
+    aws.s3::s3read_using(read.csv,
+                         object = glue("s3://newyorktime/{publication}/hk_mask/hkmask.csv")) %>%
+    # read.csv(file.path(rootpath, publication, "hk_mask", "hkmask.csv")) %>%
     rename(any_of(lookup)) %>%
     distinct(doc_id)
   
   full <-
-    # aws.s3::s3read_using(read.csv,
-    #                      object = glue("s3://newyorktime/{publication}/{publication}_full.csv")) %>%
-    read.csv(file.path(rootpath, publication, glue('{publication}_full.csv'))) %>%
+    aws.s3::s3read_using(read.csv,
+                         object = glue("s3://newyorktime/{publication}/{publication}_full.csv")) %>%
+    # read.csv(file.path(rootpath, publication, glue('{publication}_full.csv'))) %>%
     # standardize colnames
     rename(any_of(lookup)) %>%
     # deduplicate
@@ -89,14 +93,14 @@ loaddata <- function(publication, filename = "train_main1.csv") {
     # create publication column
     mutate(
       Publication = factor(publication, levels = publications),
-      text = paste(Headline, "; ", Body),
+      text =  paste(Headline, "; ", Body),
       headlow = gsub(" ", "", tolower(Headline))
     )
   
   dt <-
-    # aws.s3::s3read_using(read.csv,
-    #                      object = glue("s3://newyorktime/{publication}/date/date.csv")) %>%
-    read.csv(file.path(rootpath, publication, "date", "date.csv")) %>%
+    aws.s3::s3read_using(read.csv,
+                         object = glue("s3://newyorktime/{publication}/date/date.csv")) %>%
+    # read.csv(file.path(rootpath, publication, "date", "date.csv")) %>%
     rename(any_of(lookup))
   
   full %>%
@@ -106,8 +110,8 @@ loaddata <- function(publication, filename = "train_main1.csv") {
     merge(polimask, by = "doc_id") %>%
     mutate(doc_id = as.character(doc_id),
            Alibaba_own = baba_ownership,
-           ContentPublication = factor(paste(Publication, as.integer(Year>2016), sep="_"))
-           ) %>%
+           ContentPublication = factor(paste(Publication, as.integer(Year>2016), sep="_")),
+          text = gsub(sentencestop2, "", gsub('[[:punct:] ]+|\n', ' ', text))) %>%
     # DEDUPLICATE SHARED HEADLINES
     # ADD THIS TO STM INIT TOO
   #         headlow = gsub(" ", "", tolower(Headline))
@@ -116,7 +120,6 @@ loaddata <- function(publication, filename = "train_main1.csv") {
   # filter(n() <= 1)  %>%
   # ungroup() %>%
   #   # comment me out later
-    # head() %>%
     select("doc_id",
            "text",
            "Year",
@@ -130,9 +133,10 @@ loaddata <- function(publication, filename = "train_main1.csv") {
 df <- publications %>%
   lapply(loaddata) %>%
   bind_rows() # %>%
-# sample_n(50)
 
 
+# df <- df %>% 
+#   mutate(text = gsub(sentencestop2, "", gsub('[[:punct:] ]+|\n', ' ', text)))
 
 # final columns of import:
 # Author
@@ -170,13 +174,13 @@ out <- prepDocuments(
 # meta <-out$meta
 out$meta %>% count(Year)
 # prev_equation <- "~Publication + s(Year) + Alibaba_own"
-
+vocab <- processed$vocab
 # FIT MODEL ###################################
 
 fitmodel <- stm(
   out$documents,
   out$vocab,
-  K = 50,
+  K = 30,
   max.em.its = 75,
   data = out$meta,
   init.type = "Spectral",
@@ -189,12 +193,26 @@ fitmodel <- stm(
 summary(fitmodel)
 
 
-saveRDS(fitmodel, "./fitmodel2.RDS")
-fitmodel <- readRDS("./fitmodel.RDS")
 
+# to load into topic words into thesis, 
+# copy topic into vscode and use control+f/ control + d
+# to delete "topic" and ":"
+# copy into onenote and use tabs 
+# to make columns Topic (#), Top 7 words, label (write labels)
+# copy into office writer and bold the header row
+# add a merged top row with "Table _._: Topics for STM general Hong Kong run"
+
+saveRDS(fitmodel, "./fitmodel4.RDS")
+fitmodel <- readRDS("./fitmodel3.RDS")
+
+# protest_topics <-
+#   c(3, 6, 23, 31, 33, 35, 49) # drop 7: it's petty crime not geopolitical.
+
+# protest_topics <-
+#   c(3, 6, 25, 36, 44, 50) # 47 is tech with alibaba to investigate.
 
 protest_topics <-
-  c(3, 6, 23, 31, 33, 35, 49) # drop 7: it's petty crime not geopolitical.
+  c(2, 6, 13, 23, 29) # 47 is tech with alibaba to investigate.
 names(protest_topics) <-
   c(
     "Legislation",
@@ -255,11 +273,11 @@ makeplot(protest_topics[4])
 
 makeplot(protest_topics[5])
 
-makeplot(protest_topics[6])
+# makeplot(protest_topics[6])
 
-makeplot(protest_topics[7])
+# makeplot(protest_topics[7])
 
-plotQuote(thoughts[[2]][["Topic 3"]])
+plotQuote(thoughts[[2]][["Topic 2"]])
 
 dev.off()
 par(mfrow = c(ceiling(length(protest_topics) / 2), 2), mar = c(3, 3, 4, 1))
@@ -387,12 +405,18 @@ df %>%
   nrow
 test %>%
   nrow
+
+# test <- test %>% 
+#   mutate(text = gsub(sentencestop2, "", gsub('[[:punct:] ]+|\n', ' ', text)))
+
 processedtest <- textProcessor(
   test$text,
   onlycharacter = TRUE,
   metadata = test,
   customstemmedstops = fullstop,
 )
+
+
 new <- stm::alignCorpus(processedtest, out$vocab)
 
 testfit <-
@@ -435,7 +459,7 @@ nocovfit <-
   )
 
 
-K <- 50
+K <- 30
 testeffect <- fitmodel
 testeffect$theta <- testfit$theta
 traineffect <- fitmodel

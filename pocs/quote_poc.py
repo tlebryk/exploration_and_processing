@@ -5,10 +5,13 @@ Read files from Thesis/data/scmp/2021.csv, get text, and extract quotes
 """
 
 #%%
+from thesisutils import utils
 # import pandas as pd
-from quotes import quote_extractor
+from quotes import  entity_gender_annotator
 import spacy
 import time 
+
+
 
 
 def timeit(fn, *args, **kwargs):

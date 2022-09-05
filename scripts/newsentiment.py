@@ -230,6 +230,8 @@ print(maindf.head())
 # %%
 pub = utils.publications["globaltimes"]
 maindf = utils.timeit(run, pub, target, "test", bucket)
+maindf = utils.timeit(run, pub, target, "train", bucket)
+
 print(maindf.head())
 # %%
 pub = utils.publications["scmp"]
@@ -299,49 +301,6 @@ print(maindf.head())
 
 # import logging
 
-# import pandas as pd
-# import neuralcoref
-# %%
-# COREFF APPORACH OLD######################################
-# import spacy
 
-# logging.basicConfig(level=logging.INFO)
-# nlp = spacy.load("en_core_web_md")
-# neuralcoref.add_to_pipe(nlp)
-# #%%
-# doc = nlp("My sister has a dog. She loves him.")
-# nlp.remove_pipe(name="neuralcoref")
-# coref = neuralcoref.NeuralCoref(
-#     nlp.vocab, conv_dict={"Lam": ["woman", "Carrie", "executive"]}
-# )
-# nlp.add_pipe(coref, name="neuralcoref")
-# doc = nlp(
-#     "Carrie Lam passed the extradition bill, which Ted Hui said will ruin Hong Kong. Lam disagrees with him."
-# )
-# doc._.has_coref
-# doc._.coref_clusters[1].main.text  # .mentions[0].text
-# doc._.coref_scores
-# doc._.coref_resolved
-
-# #%%
-# df = pd.read_csv(rf"{utils.ROOTPATH}\scmp\2021.csv")
-# row = df.iloc[3]
-# r
-# doc = nlp(row.Body)
-
-# ppl = [ent for ent in doc.ents if ent.label_ == "PERSON"]
-# ppl[-1].start
-# ppl[-1].end
-# sent_start = ppl[-1].sent.start
-# off_start = ppl[-1].start - sent_start
-# off_end = ppl[-1].end
-# ppl[-1].sent
-# [p.sent for p in ppl][-1].start
-# [0]
-# # .start
-# # [1]
-
-# doc.ents[0].label_ == "PERSON"
-# print(x.Body)
 maindf.tail()[["negative", "positive", "neutral"]]
 maindf.tail().debug.apply(print)
